@@ -1,5 +1,6 @@
 import { Button, Card, Empty, Flex, Space, Table, Tag, Typography, message, Input } from 'antd'
-import { PlusOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, EditOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createDependency, createTask, getTaskDependencies, listTasks, setTaskDependencies, Task, updateTask } from '../api/client'
 import { useState } from 'react'
@@ -18,6 +19,7 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
   const { selectedProjectId } = useProjectStore()
   const { data, isLoading } = useTasks(selectedProjectId)
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [editInitial, setEditInitial] = useState<any>(null)
@@ -84,7 +86,12 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
   return (
     <Flex vertical gap={16}>
       <Flex justify="space-between" align="center">
-        {!hideTitle && <Typography.Title level={3} style={{ margin: 0 }}>Задачи</Typography.Title>}
+        {!hideTitle ? (
+          <Flex align="center" gap={8}>
+            <Button type="text" size="large" icon={<ArrowLeftOutlined style={{ fontSize: 18 }} />} onClick={() => navigate(-1)} aria-label="Назад" />
+            <Typography.Title level={3} style={{ margin: 0 }}>Задачи</Typography.Title>
+          </Flex>
+        ) : <span />}
         <Flex gap={8}>
           <Input
             placeholder="Поиск по ID"

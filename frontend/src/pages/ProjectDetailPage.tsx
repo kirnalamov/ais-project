@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { Flex, Typography, Segmented, theme } from 'antd'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Flex, Typography, Segmented, theme, Button } from 'antd'
+import { ArrowLeftOutlined } from '@ant-design/icons'
 import TasksPage from './TasksPage'
 import GraphPage from './GraphPage'
 import GanttPage from './GanttPage'
@@ -12,6 +13,7 @@ export default function ProjectDetailPage() {
   const { setSelectedProjectId } = useProjectStore()
   const [view, setView] = useState<'graph' | 'tasks' | 'gantt'>('graph')
   const { token } = theme.useToken()
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!isNaN(projectId)) setSelectedProjectId(projectId)
@@ -19,15 +21,28 @@ export default function ProjectDetailPage() {
 
   return (
     <Flex vertical gap={16}>
-      <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
-        <Typography.Title level={2} style={{ margin: 0, color: token.colorText }}>Проект #{projectId}</Typography.Title>
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
-          <Segmented
+      <div style={{ padding: '8px 0 4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Typography.Title level={2} style={{ margin: 0, color: token.colorText }}>Проект #{projectId}</Typography.Title>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 40px', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <Button
+            type="text"
             size="large"
-            options={[{ label: 'Граф', value: 'graph' }, { label: 'Задачи', value: 'tasks' }, { label: 'Гант', value: 'gantt' }]}
-            value={view}
-            onChange={(v) => setView(v as any)}
+            icon={<ArrowLeftOutlined style={{ fontSize: 20 }} />}
+            onClick={() => navigate(-1)}
+            aria-label="Назад"
+            style={{ justifySelf: 'start' }}
           />
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <Segmented
+              size="large"
+              options={[{ label: 'Граф', value: 'graph' }, { label: 'Задачи', value: 'tasks' }, { label: 'Гант', value: 'gantt' }]}
+              value={view}
+              onChange={(v) => setView(v as any)}
+            />
+          </div>
+          <span />
         </div>
       </div>
 

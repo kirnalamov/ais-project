@@ -40,9 +40,10 @@ const STATUS_STYLE: Record<GraphNode['status'], { fill: string; border: string; 
 export default function GanttView({ projectId, apiBase }: { projectId: number; apiBase: string }) {
   const { token } = theme.useToken()
   const [data, setData] = useState<GraphAnalysis | null>(null)
-  const [scale, setScale] = useState<number>(28) // px per time unit
+  const [scale, setScale] = useState<number>(32) // px per time unit (wider by default)
   const [heightPerRow] = useState<number>(44)
   const [labelWidth, setLabelWidth] = useState<number>(300)
+  const [labelTextMaxWidth, setLabelTextMaxWidth] = useState<number>(0)
   const headerH = 40
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -72,7 +73,7 @@ export default function GanttView({ projectId, apiBase }: { projectId: number; a
       const total = Math.max(1, data.duration)
       const available = Math.max(200, cw - labelWidth - 60)
       const computed = available / total
-      const min = 12
+      const min = 16
       const next = Math.max(min, Math.round(computed))
       setScale(next)
     }
@@ -80,7 +81,7 @@ export default function GanttView({ projectId, apiBase }: { projectId: number; a
     const ro = new ResizeObserver(() => fit())
     if (containerRef.current) ro.observe(containerRef.current)
     return () => ro.disconnect()
-  }, [data, labelWidth])
+  }, [data, labelWidth, labelTextMaxWidth])
 
   useEffect(() => {
     if (!labelMeasureRef.current) return
@@ -89,7 +90,8 @@ export default function GanttView({ projectId, apiBase }: { projectId: number; a
     if (!ctx) return
     ctx.font = getComputedStyle(labelMeasureRef.current).font as string
     const max = texts.reduce((m, t) => Math.max(m, ctx.measureText(t).width), 0)
-    setLabelWidth(Math.min(520, Math.max(220, Math.ceil(max) + 36)))
+    setLabelTextMaxWidth(max)
+    setLabelWidth(Math.min(900, Math.max(320, Math.ceil(max) + 44)))
   }, [rows])
 
   const totalDuration = data?.duration || 0
@@ -112,32 +114,18 @@ export default function GanttView({ projectId, apiBase }: { projectId: number; a
           </div>
           <Button size="small" onClick={() => {
             if (!svgRef.current) return
-            const svgEl = svgRef.current
+            const clone = svgRef.current.cloneNode(true) as SVGSVGElement
+            if (!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+            if (!clone.getAttribute('xmlns:xlink')) clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink')
             const serializer = new XMLSerializer()
-            const svgStr = serializer.serializeToString(svgEl)
+            const svgStr = serializer.serializeToString(clone)
             const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' })
-            const url = URL.createObjectURL(blob)
-            const img = new Image()
-            img.onload = () => {
-              const scaleFactor = window.devicePixelRatio || 2
-              const canvas = document.createElement('canvas')
-              canvas.width = svgEl.viewBox.baseVal.width * scaleFactor || svgEl.clientWidth * scaleFactor
-              canvas.height = svgEl.viewBox.baseVal.height * scaleFactor || svgEl.clientHeight * scaleFactor
-              const ctx = canvas.getContext('2d')!
-              ctx.scale(scaleFactor, scaleFactor)
-              ctx.drawImage(img, 0, 0)
-              canvas.toBlob((b) => {
-                if (!b) return
-                const a = document.createElement('a')
-                a.href = URL.createObjectURL(b)
-                a.download = `gantt_project_${data?.project_id || ''}.png`
-                a.click()
-                URL.revokeObjectURL(a.href)
-              })
-              URL.revokeObjectURL(url)
-            }
-            img.src = url
-          }}>Сохранить</Button>
+            const a = document.createElement('a')
+            a.href = URL.createObjectURL(blob)
+            a.download = `gantt_project_${data?.project_id || ''}.svg`
+            a.click()
+            setTimeout(() => URL.revokeObjectURL(a.href), 0)
+          }}>Сохранить SVG</Button>
         </Space>
       </div>
 
@@ -203,8 +191,8 @@ export default function GanttView({ projectId, apiBase }: { projectId: number; a
               const y = idx * heightPerRow
               return (
                 <g key={n.id}>
-                  <foreignObject x={8} y={y + 6} width={nameW} height={heightPerRow - 12}>
-                    <div style={{ color: '#c9d7ef', fontSize: 15, lineHeight: 1.2, fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial', display: '-webkit-box', WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden', wordBreak: 'break-word' }}>
+              <foreignObject x={8} y={y + 6} width={nameW} height={heightPerRow - 12}>
+                <div style={{ color: '#c9d7ef', fontSize: 15, lineHeight: 1.2, fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial', whiteSpace: 'nowrap' as any, overflow: 'hidden', textOverflow: 'ellipsis', wordBreak: 'keep-all' as any }}>
                       #{n.id} · {n.name}
                     </div>
                   </foreignObject>
