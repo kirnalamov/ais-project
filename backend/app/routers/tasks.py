@@ -76,6 +76,32 @@ def update_task(task_id: int, payload: TaskUpdatePayload, db: Session = Depends(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     data = payload.model_dump(exclude_unset=True)
+
+    # Enforce dependency rule: a task cannot be started or completed
+    # unless all its predecessors are done
+    new_status = data.get("status")
+    if new_status in {models.TaskStatus.in_progress, models.TaskStatus.review, models.TaskStatus.done}:
+        # Find predecessors
+        preds = (
+            db.query(models.Task)
+            .join(models.TaskDependency, models.TaskDependency.depends_on_task_id == models.Task.id)
+            .filter(models.TaskDependency.task_id == task_id)
+            .all()
+        )
+        not_done = [t.id for t in preds if t.status != models.TaskStatus.done]
+        if not_done:
+            raise HTTPException(
+                status_code=400,
+                detail="Нельзя начать/завершить задачу, пока предшественники не выполнены",
+            )
+
+    # Enforce state transition: only allow moving to DONE from IN_PROGRESS
+    if new_status == models.TaskStatus.done and task.status != models.TaskStatus.in_progress:
+        raise HTTPException(
+            status_code=400,
+            detail="Нельзя завершить задачу, которая не находится в статусе 'in_progress'",
+        )
+
     for k, v in data.items():
         setattr(task, k, v)
     db.add(task)

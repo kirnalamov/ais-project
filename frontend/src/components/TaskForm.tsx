@@ -1,10 +1,18 @@
 import { DatePicker, Form, Input, InputNumber, Modal, Select } from 'antd'
 import dayjs from 'dayjs'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 export default function TaskForm({ open, onOk, onCancel, predecessors, initialValues, title = 'Новая задача', okText = 'Создать' }: { open: boolean; onOk: (values: any) => void; onCancel: () => void; predecessors?: Array<{ id: number; name: string }>; initialValues?: any; title?: string; okText?: string }) {
   const [form] = Form.useForm()
   const [confirmLoading, setConfirmLoading] = useState(false)
+  const normalizedInitialValues = useMemo(() => {
+    if (!initialValues) return undefined
+    const { deadline, ...rest } = initialValues
+    return {
+      ...rest,
+      deadline: deadline ? dayjs(deadline) : undefined
+    }
+  }, [initialValues])
 
   const handleOk = async () => {
     try {
@@ -22,7 +30,7 @@ export default function TaskForm({ open, onOk, onCancel, predecessors, initialVa
 
   return (
     <Modal open={open} title={title} onOk={handleOk} onCancel={onCancel} confirmLoading={confirmLoading} okText={okText} cancelText="Отмена">
-      <Form layout="vertical" form={form} initialValues={{ status: 'backlog', priority: 'medium', duration_plan: 1, ...initialValues }}>
+      <Form layout="vertical" form={form} initialValues={{ status: 'backlog', priority: 'medium', duration_plan: 1, ...(normalizedInitialValues || {}) }}>
         <Form.Item label="Название" name="name" rules={[{ required: true, message: 'Укажите название' }]}>
           <Input placeholder="Например: Подготовка ТЗ" />
         </Form.Item>

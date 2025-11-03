@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import ReactFlow, { Background, Controls, MiniMap, MarkerType, Node as RFNode, Edge as RFEdge, useEdgesState, useNodesState, Position, Handle, BaseEdge, getSimpleBezierPath, type EdgeProps } from 'reactflow'
 import 'reactflow/dist/style.css'
 import dagre from 'dagre'
-import { Card, Space, Tag, Button } from 'antd'
+import { Card, Space, Tag, Button, Tooltip } from 'antd'
 import { CheckCircleTwoTone, SyncOutlined, CloseCircleTwoTone } from '@ant-design/icons'
 import { updateTask } from '../api/client'
 import { useProjectStore } from '../store/useProjectStore'
@@ -135,12 +135,12 @@ function GradientBezierEdge(props: EdgeProps) {
   return (
     <g>
       <defs>
-        <linearGradient id={gradId} gradientUnits="userSpaceOnUse">
+        <linearGradient id={gradId} gradientUnits="userSpaceOnUse" x1={props.sourceX} y1={props.sourceY} x2={props.targetX} y2={props.targetY}>
           <stop offset="0%" stopColor={src} />
           <stop offset="100%" stopColor={dst} />
         </linearGradient>
       </defs>
-      <BaseEdge id={props.id} path={edgePath} style={{ ...props.style, stroke: `url(#${gradId})`, strokeWidth }} markerEnd={props.markerEnd} />
+      <BaseEdge id={props.id} path={edgePath} style={{ ...props.style, stroke: `url(#${gradId})`, strokeWidth, strokeLinecap: 'round' }} markerEnd={props.markerEnd} />
     </g>
   )
 }
@@ -157,6 +157,17 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
   const [viewport, setViewport] = useState<{ x: number; y: number; zoom: number }>({ x: 0, y: 0, zoom: 1 })
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
   const { graphRefreshTick } = useProjectStore()
+  const criticalSet = useMemo(() => new Set<number>(data?.critical_path || []), [data])
+  const canAct = useMemo(() => {
+    if (!data || !clickNode) return { canStart: true, canDone: true }
+    const preds = data.edges.filter(e => e.target === clickNode.id).map(e => e.source)
+    if (preds.length === 0) return { canStart: true, canDone: true }
+    const allPredsDone = preds.every(pid => data.nodes.find(n => n.id === pid)?.status === 'done')
+    const canStart = allPredsDone
+    // Done allowed only if predecessors done AND current status is in_progress
+    const canDone = allPredsDone && clickNode.status === 'in_progress'
+    return { canStart, canDone }
+  }, [data, clickNode])
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     if (!data) return { nodes: [], edges: [] } as { nodes: RFNode[]; edges: RFEdge[] }
@@ -258,10 +269,14 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
             <div style={{ color: '#bbb' }}>Статус: <Tag>{clickNode.status}</Tag></div>
             <div style={{ color: '#bbb' }}>Длительность: {clickNode.duration}</div>
             <div style={{ color: '#aaa' }}>ES/EF: {clickNode.es}/{clickNode.ef} · LS/LF: {clickNode.ls}/{clickNode.lf} · Slack: {clickNode.slack}</div>
-            {clickNode.is_critical && <Tag color="red">Критический путь</Tag>}
+            {criticalSet.has(clickNode.id) && <Tag color="red">Критический путь</Tag>}
             <Space wrap size={[8, 8]}>
-              <Button size="small" icon={<CheckCircleTwoTone twoToneColor="#52c41a" />} onClick={async () => { await updateTask(clickNode.id, { status: 'done' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>Done</Button>
-              <Button size="small" icon={<SyncOutlined spin={false} />} onClick={async () => { await updateTask(clickNode.id, { status: 'in_progress' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>In Progress</Button>
+              <Tooltip title={!canAct.canDone ? (clickNode.status !== 'in_progress' ? "Нельзя завершить: задача не 'in_progress'" : 'Сначала завершите все предшественники') : undefined}>
+                <Button size="small" disabled={!canAct.canDone} icon={<CheckCircleTwoTone twoToneColor="#52c41a" />} onClick={async () => { await updateTask(clickNode.id, { status: 'done' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>Done</Button>
+              </Tooltip>
+              <Tooltip title={!canAct.canStart ? 'Нельзя начать: есть незавершённые предшественники' : undefined}>
+                <Button size="small" disabled={!canAct.canStart} icon={<SyncOutlined spin={false} />} onClick={async () => { await updateTask(clickNode.id, { status: 'in_progress' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>In Progress</Button>
+              </Tooltip>
               <Button size="small" icon={<CloseCircleTwoTone twoToneColor="#ff4d4f" />} onClick={async () => { await updateTask(clickNode.id, { status: 'backlog' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>Backlog</Button>
             </Space>
           </div>
