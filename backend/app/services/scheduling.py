@@ -64,12 +64,12 @@ def build_graph_and_cpm(project_id: int, tasks: List[models.Task], dependencies:
     slack: Dict[int, int] = {tid: ls[tid] - es[tid] for tid in id_to_task}
     critical_nodes = {tid for tid, s in slack.items() if s == 0}
 
-    # Recover one critical path (not necessarily unique)
+    # Recover a single deterministic critical path
     critical_path: List[int] = []
     # Start from a source critical node
     start_candidates = [tid for tid in topo_order if tid in critical_nodes and es[tid] == 0]
     if start_candidates:
-        u = start_candidates[0]
+        u = sorted(start_candidates)[0]
         critical_path.append(u)
         while True:
             next_candidates = [
@@ -79,7 +79,7 @@ def build_graph_and_cpm(project_id: int, tasks: List[models.Task], dependencies:
             ]
             if not next_candidates:
                 break
-            u = next_candidates[0]
+            u = sorted(next_candidates)[0]
             critical_path.append(u)
 
     nodes: List[schemas.GraphNode] = [
