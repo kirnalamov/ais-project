@@ -53,6 +53,12 @@ body {
   background: rgba(0, 185, 111, 0.18) !important;
   border-color: rgba(0, 185, 111, 0.45) !important;
 }
+.react-flow__controls button svg {
+  fill: #c7d2e8 !important; /* softer, not bright white */
+}
+.react-flow__controls button:hover svg {
+  fill: #e9fff6 !important;
+}
 .react-flow__controls button:active {
   background: rgba(0, 185, 111, 0.28) !important;
 }

@@ -84,6 +84,7 @@ class GraphEdge(BaseModel):
     source: int
     target: int
     dependency_type: DependencyType
+    redundant: bool = False
 
 
 class GraphAnalysis(BaseModel):

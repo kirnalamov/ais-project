@@ -1,4 +1,4 @@
-import { Button, Card, Empty, Flex, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Empty, Flex, Space, Table, Tag, Typography, message, Input } from 'antd'
 import { PlusOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createDependency, createTask, getTaskDependencies, listTasks, setTaskDependencies, Task, updateTask } from '../api/client'
@@ -22,6 +22,7 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
   const [editOpen, setEditOpen] = useState(false)
   const [editInitial, setEditInitial] = useState<any>(null)
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
+  const [searchId, setSearchId] = useState<string>('')
   const { bumpGraphRefresh } = useProjectStore()
 
   const columns = [
@@ -85,6 +86,13 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
       <Flex justify="space-between" align="center">
         {!hideTitle && <Typography.Title level={3} style={{ margin: 0 }}>Задачи</Typography.Title>}
         <Flex gap={8}>
+          <Input
+            placeholder="Поиск по ID"
+            value={searchId}
+            onChange={(e) => setSearchId(e.target.value)}
+            allowClear
+            style={{ width: 150 }}
+          />
           <Button icon={<ReloadOutlined />} onClick={() => qc.invalidateQueries({ queryKey: ['tasks', selectedProjectId] })} disabled={!selectedProjectId}>Обновить</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)} disabled={!selectedProjectId}>Новая задача</Button>
         </Flex>
@@ -94,7 +102,11 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
           <Table<Task>
             rowKey="id"
             loading={isLoading}
-            dataSource={data || []}
+            dataSource={(data || []).filter(t => {
+              const q = searchId.trim()
+              if (!q) return true
+              return String(t.id).includes(q)
+            })}
             columns={columns}
             pagination={{ pageSize: 10 }}
           />

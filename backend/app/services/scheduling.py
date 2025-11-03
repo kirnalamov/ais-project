@@ -16,7 +16,7 @@ def build_graph_and_cpm(project_id: int, tasks: List[models.Task], dependencies:
     reverse_adj: Dict[int, List[int]] = defaultdict(list)
     indegree: Dict[int, int] = {t.id: 0 for t in tasks}
 
-    edges: List[schemas.GraphEdge] = []
+    edge_pairs: List[Tuple[int, int]] = []
     for dep in dependencies:
         src = dep.depends_on_task_id
         dst = dep.task_id
@@ -25,9 +25,7 @@ def build_graph_and_cpm(project_id: int, tasks: List[models.Task], dependencies:
         adjacency[src].append(dst)
         reverse_adj[dst].append(src)
         indegree[dst] += 1
-        edges.append(
-            schemas.GraphEdge(source=src, target=dst, dependency_type=dep.dependency_type)
-        )
+        edge_pairs.append((src, dst))
 
     topo_order: List[int] = []
     q: deque[int] = deque([tid for tid, deg in indegree.items() if deg == 0])
@@ -97,6 +95,40 @@ def build_graph_and_cpm(project_id: int, tasks: List[models.Task], dependencies:
         )
         for tid in topo_order
     ]
+
+    # Mark transitive edges for visualization (keep them but style as dashed/transparent)
+    # Edge u->v is redundant if there exists an alternative path from u to v
+    def has_alternative_path(u: int, v: int) -> bool:
+        stack = list(adjacency.get(u, []))
+        # skip the direct edge u->v
+        stack = [x for x in stack if x != v]
+        seen = set([u])
+        while stack:
+            w = stack.pop()
+            if w == v:
+                return True
+            if w in seen:
+                continue
+            seen.add(w)
+            for nxt in adjacency.get(w, []):
+                if nxt not in seen:
+                    stack.append(nxt)
+        return False
+
+    dep_type_map: Dict[Tuple[int, int], models.DependencyType] = {}
+    for dep in dependencies:
+        dep_type_map[(dep.depends_on_task_id, dep.task_id)] = dep.dependency_type
+
+    edges: List[schemas.GraphEdge] = []
+    for (u, v) in edge_pairs:
+        edges.append(
+            schemas.GraphEdge(
+                source=u,
+                target=v,
+                dependency_type=dep_type_map[(u, v)],
+                redundant=has_alternative_path(u, v),
+            )
+        )
 
     return schemas.GraphAnalysis(
         project_id=project_id,

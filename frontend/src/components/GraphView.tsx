@@ -24,6 +24,7 @@ type GraphEdge = {
   source: number
   target: number
   dependency_type: string
+  redundant?: boolean
 }
 
 type GraphAnalysis = {
@@ -50,7 +51,7 @@ const EDGE_COLOR_FROM_STATUS: Record<GraphNode['status'], string> = {
 
 function buildLayout(data: GraphAnalysis): { nodes: RFNode[]; edges: RFEdge[] } {
   const g = new dagre.graphlib.Graph()
-  g.setGraph({ rankdir: 'LR', nodesep: 120, ranksep: 140 })
+  g.setGraph({ rankdir: 'LR', nodesep: 150, ranksep: 180 })
   g.setDefaultEdgeLabel(() => ({}))
 
   const width = 54
@@ -73,12 +74,37 @@ function buildLayout(data: GraphAnalysis): { nodes: RFNode[]; edges: RFEdge[] } 
     }
   })
 
-  const rfEdges: RFEdge[] = data.edges.map(e => {
+  // Pre-compute offsets for edges converging to the same target to reduce overlap
+  const posById: Record<number, { x: number; y: number }> = {}
+  data.nodes.forEach(n => {
+    const p = g.node(String(n.id))
+    posById[n.id] = { x: p?.x || 0, y: p?.y || 0 }
+  })
+  const incomingByTarget: Record<number, Array<{ e: GraphEdge; sy: number }>> = {}
+  data.edges.forEach(e => {
+    const arr = incomingByTarget[e.target] || (incomingByTarget[e.target] = [])
+    arr.push({ e, sy: posById[e.source]?.y || 0 })
+  })
+  Object.values(incomingByTarget).forEach(arr => arr.sort((a, b) => a.sy - b.sy))
+  const offsetMap: Record<string, number> = {}
+  Object.entries(incomingByTarget).forEach(([target, arr]) => {
+    const n = arr.length
+    arr.forEach((item, idx) => {
+      const key = `${item.e.source}->${item.e.target}`
+      const offset = (idx - (n - 1) / 2) * 12 // px
+      offsetMap[key] = offset
+    })
+  })
+
+  const sortedEdges = [...data.edges].sort((a, b) => Number(!!a.redundant) - Number(!!b.redundant))
+  const rfEdges: RFEdge[] = sortedEdges.map(e => {
     const sourceNode = data.nodes.find(n => n.id === e.source)!
     const color = EDGE_COLOR_FROM_STATUS[sourceNode.status]
     const targetNode = data.nodes.find(n => n.id === e.target)!
     const targetColor = EDGE_COLOR_FROM_STATUS[targetNode.status]
     const isCritical = criticalSet.has(e.source) && criticalSet.has(e.target)
+    const offset = offsetMap[`${e.source}->${e.target}`] || 0
+    const isDimmed = !!e.redundant
     return {
       id: `${e.source}->${e.target}`,
       source: String(e.source),
@@ -86,9 +112,9 @@ function buildLayout(data: GraphAnalysis): { nodes: RFNode[]; edges: RFEdge[] } 
       type: 'gradient',
       sourceHandle: 'r',
       targetHandle: 'l',
-      style: { stroke: color, strokeWidth: isCritical ? 6 : 3, opacity: 0.95 },
+      style: { stroke: color, strokeWidth: isCritical ? 6 : isDimmed ? 2 : 3, opacity: isDimmed ? 0.35 : 0.95, strokeDasharray: isDimmed ? '6 8' : undefined },
       markerEnd: { type: MarkerType.ArrowClosed, color: targetColor },
-      data: { sourceColor: color, targetColor },
+      data: { sourceColor: color, targetColor, offset },
       animated: false
     }
   })
@@ -127,11 +153,21 @@ function StatusNode({ data }: { data: { node: GraphNode; style: { bg: string; bo
 const nodeTypes = { statusNode: StatusNode }
 
 function GradientBezierEdge(props: EdgeProps) {
-  const [edgePath] = getSimpleBezierPath(props)
   const strokeWidth = (props.style as any)?.strokeWidth || 3
   const src = (props.data as any)?.sourceColor || '#999'
   const dst = (props.data as any)?.targetColor || '#999'
+  const offset = (props.data as any)?.offset || 0
   const gradId = `grad-${props.id}`
+
+  // Bezier path with slight vertical offsets to reduce overlap but preserve smooth curves
+  const [edgePath] = getSimpleBezierPath({
+    sourceX: props.sourceX,
+    sourceY: props.sourceY + offset * 0.4,
+    sourcePosition: props.sourcePosition,
+    targetX: props.targetX,
+    targetY: props.targetY - offset * 0.4,
+    targetPosition: props.targetPosition,
+  } as any)
   return (
     <g>
       <defs>
@@ -209,9 +245,10 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
     setPanelPos({ x: sx, y: sy })
   }, [clickNodeMeta, viewport])
 
+  const bg = '#0a0d12'
   const containerStyle = isFullscreen
-    ? { position: 'fixed' as const, inset: 0, width: '100vw', height: '100vh', zIndex: 1000, border: 'none', borderRadius: 0, background: '#141414', overflow: 'hidden' }
-    : { width: '100%', height: readonly ? 360 : 780, background: '#141414', overflow: 'hidden' }
+    ? { position: 'fixed' as const, inset: 0, width: '100vw', height: '100vh', zIndex: 1000, border: 'none', borderRadius: 0, background: bg, overflow: 'hidden' }
+    : { width: '100%', height: readonly ? 360 : 'calc(100vh - 220px)', background: bg, overflow: 'hidden' }
 
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -258,14 +295,15 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
           selectionOnDrag={false}
           proOptions={{ hideAttribution: true }}
         >
-          <Background color="#1f1f1f" gap={24} />
-          {!readonly && <MiniMap style={{ background: '#0f131a', border: '1px solid #2b2b2b', borderRadius: 8 }} nodeStrokeColor="#384355" nodeColor="#1e2735" maskColor="rgba(11,15,21,0.65)" />}
-          <Controls position="bottom-right" />
+          <Background color="#16202c" gap={24} />
+          {!readonly && <MiniMap style={{ background: '#0f131a', border: '1px solid #2b2b2b', borderRadius: 8, right: 16, bottom: 16 }} nodeStrokeColor="#384355" nodeColor="#1e2735" maskColor="rgba(11,15,21,0.65)" />}
+          <Controls position="bottom-right" style={{ right: 16, bottom: 190 }} />
         </ReactFlow>
 
         {!readonly && clickNode && panelPos && (
           <div style={{ position: 'absolute', left: panelPos.x, top: panelPos.y, width: 280, background: '#0f0f0f', border: '1px solid #2b2b2b', borderRadius: 10, zIndex: 1002, padding: 10, display: 'flex', flexDirection: 'column', gap: 8, boxShadow: '0 8px 28px rgba(0,0,0,0.45)' }}>
             <div style={{ fontWeight: 600, color: '#e8e8e8' }}>{clickNode.name}</div>
+            <div style={{ color: '#9fb0c7', fontSize: 12 }}>ID: <b style={{ color: '#e8e8e8' }}>#{clickNode.id}</b></div>
             <div style={{ color: '#bbb' }}>Статус: <Tag>{clickNode.status}</Tag></div>
             <div style={{ color: '#bbb' }}>Длительность: {clickNode.duration}</div>
             <div style={{ color: '#aaa' }}>ES/EF: {clickNode.es}/{clickNode.ef} · LS/LF: {clickNode.ls}/{clickNode.lf} · Slack: {clickNode.slack}</div>

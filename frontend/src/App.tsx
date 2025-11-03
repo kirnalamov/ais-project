@@ -1,6 +1,6 @@
 import React from 'react'
 import { Layout, Menu, theme, Typography, Button } from 'antd'
-import { ProjectOutlined, ApartmentOutlined, UnorderedListOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
+import { ProjectOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import ProjectsPage from './pages/ProjectsPage'
 import TasksPage from './pages/TasksPage'
@@ -13,11 +13,9 @@ export default function App() {
   const location = useLocation()
   const { token } = theme.useToken()
   const [collapsed, setCollapsed] = React.useState(false)
-  const selectedKey = location.pathname.startsWith('/tasks') ? 'tasks' : location.pathname.startsWith('/graph') ? 'graph' : 'projects'
+  const selectedKey = 'projects'
   const menuItems = [
-    { key: 'projects', icon: <ProjectOutlined />, label: <Link to="/projects">Проекты</Link> },
-    { key: 'tasks', icon: <UnorderedListOutlined />, label: <Link to="/tasks">Задачи</Link> },
-    { key: 'graph', icon: <ApartmentOutlined />, label: <Link to="/graph">Граф</Link> }
+    { key: 'projects', icon: <ProjectOutlined />, label: <Link to="/projects">Проекты</Link> }
   ]
   return (
     <Layout style={{ minHeight: '100vh', position: 'relative' }} className="app-grid-bg">
