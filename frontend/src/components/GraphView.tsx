@@ -297,7 +297,7 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
         >
           <Background color="#16202c" gap={24} />
           {!readonly && <MiniMap style={{ background: '#0f131a', border: '1px solid #2b2b2b', borderRadius: 8, right: 16, bottom: 16 }} nodeStrokeColor="#384355" nodeColor="#1e2735" maskColor="rgba(11,15,21,0.65)" />}
-          <Controls position="bottom-right" style={{ right: 16, bottom: 190 }} />
+          <Controls position="top-right" style={{ right: 16, top: 56, bottom: 'auto' }} />
         </ReactFlow>
 
         {!readonly && clickNode && panelPos && (
