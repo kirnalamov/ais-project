@@ -14,7 +14,7 @@ function useTasks(projectId: number | null) {
   })
 }
 
-export default function TasksPage() {
+export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean } = {}) {
   const { selectedProjectId } = useProjectStore()
   const { data, isLoading } = useTasks(selectedProjectId)
   const qc = useQueryClient()
@@ -83,7 +83,7 @@ export default function TasksPage() {
   return (
     <Flex vertical gap={16}>
       <Flex justify="space-between" align="center">
-        <Typography.Title level={3} style={{ margin: 0 }}>Задачи</Typography.Title>
+        {!hideTitle && <Typography.Title level={3} style={{ margin: 0 }}>Задачи</Typography.Title>}
         <Flex gap={8}>
           <Button icon={<ReloadOutlined />} onClick={() => qc.invalidateQueries({ queryKey: ['tasks', selectedProjectId] })} disabled={!selectedProjectId}>Обновить</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)} disabled={!selectedProjectId}>Новая задача</Button>

@@ -1,5 +1,6 @@
-import { Layout, Menu, theme, Typography } from 'antd'
-import { ProjectOutlined, ApartmentOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import React from 'react'
+import { Layout, Menu, theme, Typography, Button } from 'antd'
+import { ProjectOutlined, ApartmentOutlined, UnorderedListOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import ProjectsPage from './pages/ProjectsPage'
 import TasksPage from './pages/TasksPage'
@@ -10,28 +11,26 @@ const { Header, Sider, Content } = Layout
 
 export default function App() {
   const location = useLocation()
+  const { token } = theme.useToken()
+  const [collapsed, setCollapsed] = React.useState(false)
   const selectedKey = location.pathname.startsWith('/tasks') ? 'tasks' : location.pathname.startsWith('/graph') ? 'graph' : 'projects'
+  const menuItems = [
+    { key: 'projects', icon: <ProjectOutlined />, label: <Link to="/projects">Проекты</Link> },
+    { key: 'tasks', icon: <UnorderedListOutlined />, label: <Link to="/tasks">Задачи</Link> },
+    { key: 'graph', icon: <ApartmentOutlined />, label: <Link to="/graph">Граф</Link> }
+  ]
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider breakpoint="lg" collapsedWidth="0">
+    <Layout style={{ minHeight: '100vh', position: 'relative' }} className="app-grid-bg">
+      <Sider collapsible collapsed={collapsed} trigger={false} breakpoint="lg" collapsedWidth="0">
         <div style={{ height: 48, margin: 16, color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center' }}>Planner</div>
-        <Menu theme="dark" mode="inline" selectedKeys={[selectedKey]}>
-          <Menu.Item key="projects" icon={<ProjectOutlined />}>
-            <Link to="/projects">Проекты</Link>
-          </Menu.Item>
-          <Menu.Item key="tasks" icon={<UnorderedListOutlined />}>
-            <Link to="/tasks">Задачи</Link>
-          </Menu.Item>
-          <Menu.Item key="graph" icon={<ApartmentOutlined />}>
-            <Link to="/graph">Граф</Link>
-          </Menu.Item>
-        </Menu>
+        <Menu theme="dark" mode="inline" selectedKeys={[selectedKey]} items={menuItems} />
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', paddingInline: 24, display: 'flex', alignItems: 'center' }}>
-          <Typography.Title level={4} style={{ margin: 0 }}>Корпоративный планировщик задач</Typography.Title>
+        <Header style={{ background: token.colorBgElevated, borderBottom: `1px solid ${token.colorBorder}`, paddingInline: 12, display: 'flex', alignItems: 'center', gap: 12, height: 52, lineHeight: '52px' }}>
+          <Button type="text" style={{ color: token.colorText }} icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setCollapsed(!collapsed)} />
+          <Typography.Title level={4} style={{ margin: 0, color: token.colorText }}>Корпоративный планировщик задач</Typography.Title>
         </Header>
-        <Content style={{ margin: 24 }}>
+        <Content style={{ margin: 16 }}>
           <Routes>
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import ReactFlow, { Background, Controls, MiniMap, MarkerType, Node as RFNode, Edge as RFEdge, useEdgesState, useNodesState, Position, Handle, BaseEdge, getSimpleBezierPath, type EdgeProps } from 'reactflow'
 import 'reactflow/dist/style.css'
 import dagre from 'dagre'
@@ -147,10 +147,14 @@ function GradientBezierEdge(props: EdgeProps) {
 
 const edgeTypes = { gradient: GradientBezierEdge }
 
-export default function GraphView({ projectId, apiBase, readonly = false }: { projectId: number, apiBase: string, readonly?: boolean }) {
+export default function GraphView({ projectId, apiBase, readonly = false, showDuration = true }: { projectId: number, apiBase: string, readonly?: boolean; showDuration?: boolean }) {
   const [data, setData] = useState<GraphAnalysis | null>(null)
   const [hoverNode, setHoverNode] = useState<GraphNode | null>(null)
   const [clickNode, setClickNode] = useState<GraphNode | null>(null)
+  const [clickNodeMeta, setClickNodeMeta] = useState<RFNode | null>(null)
+  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [viewport, setViewport] = useState<{ x: number; y: number; zoom: number }>({ x: 0, y: 0, zoom: 1 })
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
   const { graphRefreshTick } = useProjectStore()
 
@@ -175,25 +179,51 @@ export default function GraphView({ projectId, apiBase, readonly = false }: { pr
     setEdges(initialEdges)
   }, [initialNodes, initialEdges, setNodes, setEdges])
 
+  // Keep floating panel next to node and inside viewport
+  useEffect(() => {
+    if (!clickNodeMeta || !containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    const { x: tx, y: ty, zoom } = viewport
+    const posAbs = (clickNodeMeta as any)?.positionAbsolute || { x: 0, y: 0 }
+    const NODE_W = 54
+    const panelW = 280
+    const panelH = 180
+    // Flow->screen transform
+    let sx = (posAbs.x + NODE_W + 12) * zoom + tx
+    let sy = (posAbs.y - 12) * zoom + ty
+    // Clamp within container
+    const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
+    sx = clamp(sx, 8, rect.width - panelW - 8)
+    sy = clamp(sy, 8, rect.height - panelH - 8)
+    setPanelPos({ x: sx, y: sy })
+  }, [clickNodeMeta, viewport])
+
   const containerStyle = isFullscreen
     ? { position: 'fixed' as const, inset: 0, width: '100vw', height: '100vh', zIndex: 1000, border: 'none', borderRadius: 0, background: '#141414', overflow: 'hidden' }
-    : { width: '100%', height: readonly ? 360 : 780, border: '1px solid #2b2b2b', borderRadius: 8, background: '#141414', overflow: 'hidden' }
+    : { width: '100%', height: readonly ? 360 : 780, background: '#141414', overflow: 'hidden' }
 
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div>
-        {data ? (
-          <span>Длительность проекта: <b>{data.duration}</b></span>
-        ) : (
-          <span>Нет данных для отображения</span>
-        )}
-      </div>
-      <div style={containerStyle}>
-        {!readonly && (
-          <div style={{ position: 'absolute', right: 10, top: 10, zIndex: 1001 }}>
+      {showDuration && (
+        <div>
+          {data ? (
+            <span>Длительность проекта: <b>{data.duration}</b></span>
+          ) : (
+            <span>Нет данных для отображения</span>
+          )}
+        </div>
+      )}
+      <div style={containerStyle} ref={containerRef}>
+        <div style={{ position: 'absolute', right: 10, top: 10, zIndex: 1001, display: 'flex', gap: 8, alignItems: 'center' }}>
+          {data && (
+            <div style={{ background: '#0f0f0f', border: '1px solid #2b2b2b', color: '#9fb0c7', borderRadius: 8, padding: '6px 10px' }}>
+              Проект #{data.project_id} · Длит.: <b style={{ color: '#e8e8e8' }}>{data.duration}</b>
+            </div>
+          )}
+          {!readonly && (
             <Button size="small" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? 'Закрыть' : 'Во весь экран'}</Button>
-          </div>
-        )}
+          )}
+        </div>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -205,36 +235,35 @@ export default function GraphView({ projectId, apiBase, readonly = false }: { pr
           fitViewOptions={{ padding: 0.2 }}
           onNodeMouseEnter={(_, n) => setHoverNode((n.data as any)?.node)}
           onNodeMouseLeave={() => setHoverNode(null)}
-          onNodeClick={(_, n) => !readonly && setClickNode((n.data as any)?.node)}
-          onPaneClick={() => setClickNode(null)}
+          onNodeClick={(evt, n) => {
+            if (readonly) return
+            setClickNode((n.data as any)?.node)
+            setClickNodeMeta(n)
+          }}
+          onPaneClick={() => { setClickNode(null); setPanelPos(null) }}
+          onMove={(_, v) => setViewport(v)}
           defaultEdgeOptions={{ type: 'gradient' }}
           panOnScroll
           selectionOnDrag={false}
           proOptions={{ hideAttribution: true }}
         >
           <Background color="#1f1f1f" gap={24} />
-          {!readonly && <MiniMap nodeStrokeColor="#222" nodeColor="#333" maskColor="rgba(20,20,20,0.6)" />}
+          {!readonly && <MiniMap style={{ background: '#0f131a', border: '1px solid #2b2b2b', borderRadius: 8 }} nodeStrokeColor="#384355" nodeColor="#1e2735" maskColor="rgba(11,15,21,0.65)" />}
           <Controls position="bottom-right" />
         </ReactFlow>
 
-        {!readonly && (
-          <div style={{ position: 'absolute', top: 12, right: 12, width: 320, bottom: 12, background: '#0f0f0f', border: '1px solid #2b2b2b', borderRadius: 8, zIndex: 1002, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {clickNode ? (
-              <>
-                <div style={{ fontWeight: 600, color: '#e8e8e8' }}>{clickNode.name}</div>
-                <div style={{ color: '#bbb' }}>Статус: <Tag>{clickNode.status}</Tag></div>
-                <div style={{ color: '#bbb' }}>Длительность: {clickNode.duration}</div>
-                <div style={{ color: '#aaa' }}>ES/EF: {clickNode.es}/{clickNode.ef} · LS/LF: {clickNode.ls}/{clickNode.lf} · Slack: {clickNode.slack}</div>
-                {clickNode.is_critical && <Tag color="red">Критический путь</Tag>}
-                <Space>
-                  <Button size="small" icon={<CheckCircleTwoTone twoToneColor="#52c41a" />} onClick={async () => { await updateTask(clickNode.id, { status: 'done' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>Done</Button>
-                  <Button size="small" icon={<SyncOutlined spin={false} />} onClick={async () => { await updateTask(clickNode.id, { status: 'in_progress' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>In Progress</Button>
-                  <Button size="small" icon={<CloseCircleTwoTone twoToneColor="#ff4d4f" />} onClick={async () => { await updateTask(clickNode.id, { status: 'backlog' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>Backlog</Button>
-                </Space>
-              </>
-            ) : (
-              <div style={{ color: '#9a9a9a' }}>Выберите ноду, чтобы увидеть детали и действия</div>
-            )}
+        {!readonly && clickNode && panelPos && (
+          <div style={{ position: 'absolute', left: panelPos.x, top: panelPos.y, width: 280, background: '#0f0f0f', border: '1px solid #2b2b2b', borderRadius: 10, zIndex: 1002, padding: 10, display: 'flex', flexDirection: 'column', gap: 8, boxShadow: '0 8px 28px rgba(0,0,0,0.45)' }}>
+            <div style={{ fontWeight: 600, color: '#e8e8e8' }}>{clickNode.name}</div>
+            <div style={{ color: '#bbb' }}>Статус: <Tag>{clickNode.status}</Tag></div>
+            <div style={{ color: '#bbb' }}>Длительность: {clickNode.duration}</div>
+            <div style={{ color: '#aaa' }}>ES/EF: {clickNode.es}/{clickNode.ef} · LS/LF: {clickNode.ls}/{clickNode.lf} · Slack: {clickNode.slack}</div>
+            {clickNode.is_critical && <Tag color="red">Критический путь</Tag>}
+            <Space wrap size={[8, 8]}>
+              <Button size="small" icon={<CheckCircleTwoTone twoToneColor="#52c41a" />} onClick={async () => { await updateTask(clickNode.id, { status: 'done' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>Done</Button>
+              <Button size="small" icon={<SyncOutlined spin={false} />} onClick={async () => { await updateTask(clickNode.id, { status: 'in_progress' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>In Progress</Button>
+              <Button size="small" icon={<CloseCircleTwoTone twoToneColor="#ff4d4f" />} onClick={async () => { await updateTask(clickNode.id, { status: 'backlog' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>Backlog</Button>
+            </Space>
           </div>
         )}
       </div>
