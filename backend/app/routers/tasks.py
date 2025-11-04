@@ -129,15 +129,18 @@ def update_task(
         raise HTTPException(status_code=404, detail="Task not found")
     data = payload.model_dump(exclude_unset=True)
 
+    # Admin has full access to all tasks without restrictions
+    is_admin = current_user.role == models.UserRole.admin
+
     # Permissions: executors can update only their tasks and limited fields
-    if current_user.role == models.UserRole.executor:
+    if not is_admin and current_user.role == models.UserRole.executor:
         if task.assignee_id != current_user.id:
             raise HTTPException(status_code=403, detail="Можно изменять только свои задачи")
         allowed_fields = {"status", "description"}
         data = {k: v for k, v in data.items() if k in allowed_fields}
 
     # Managers must manage the project or be a member
-    if current_user.role == models.UserRole.manager:
+    if not is_admin and current_user.role == models.UserRole.manager:
         project = db.query(models.Project).get(task.project_id)
         if not project or project.manager_id != current_user.id:
             is_member = (
@@ -163,9 +166,9 @@ def update_task(
             raise HTTPException(status_code=400, detail="Исполнитель не состоит в проекте")
 
     # Enforce dependency rule: a task cannot be started or completed
-    # unless all its predecessors are done
+    # unless all its predecessors are done (skip for admin)
     new_status = data.get("status")
-    if new_status in {models.TaskStatus.in_progress, models.TaskStatus.review, models.TaskStatus.done}:
+    if not is_admin and new_status in {models.TaskStatus.in_progress, models.TaskStatus.review, models.TaskStatus.done}:
         # Find predecessors
         preds = (
             db.query(models.Task)
@@ -180,8 +183,8 @@ def update_task(
                 detail="Нельзя начать/завершить задачу, пока предшественники не выполнены",
             )
 
-    # Enforce state transition: only allow moving to DONE from IN_PROGRESS
-    if new_status == models.TaskStatus.done and task.status != models.TaskStatus.in_progress:
+    # Enforce state transition: only allow moving to DONE from IN_PROGRESS (skip for admin)
+    if not is_admin and new_status == models.TaskStatus.done and task.status != models.TaskStatus.in_progress:
         raise HTTPException(
             status_code=400,
             detail="Нельзя завершить задачу, которая не находится в статусе 'in_progress'",

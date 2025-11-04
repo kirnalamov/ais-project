@@ -86,7 +86,16 @@ export default function ChatsPage() {
           <Typography.Title level={3} style={{ margin: 0 }}>Чаты задач</Typography.Title>
         </Flex>
         <Flex gap={8}>
-          <Input placeholder="Поиск" value={search} onChange={(e) => setSearch(e.target.value)} allowClear style={{ width: 220 }} autoComplete="off" />
+          <Input
+            placeholder="Поиск"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            allowClear
+            style={{ width: 220 }}
+            autoComplete="off"
+            name="chat-search"
+            id="chat-search"
+          />
           <Button icon={<ReloadOutlined />} onClick={() => qc.invalidateQueries({ queryKey: ['tasks', selectedProjectId] })} disabled={!selectedProjectId}>Обновить</Button>
         </Flex>
       </Flex>

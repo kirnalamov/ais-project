@@ -70,7 +70,14 @@ export default function TaskChatDrawer({ taskId, open, onClose, taskTitle }: { t
         })}
       </div>
       <Space.Compact style={{ width: '100%' }}>
-        <Input value={text} onChange={e => setText(e.target.value)} placeholder="Сообщение" onPressEnter={onSend} />
+        <Input
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder="Сообщение"
+          onPressEnter={onSend}
+          name="task-chat-message"
+          id="task-chat-message"
+        />
         <Button type="primary" onClick={onSend}>Отправить</Button>
       </Space.Compact>
     </Drawer>

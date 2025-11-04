@@ -145,6 +145,8 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
             allowClear
             style={{ width: 150 }}
             autoComplete="off"
+            name="task-id-search"
+            id="task-id-search"
           />
           <Button icon={<ReloadOutlined />} onClick={() => qc.invalidateQueries({ queryKey: ['tasks', selectedProjectId] })} disabled={!selectedProjectId}>Обновить</Button>
           {(role === 'admin' || role === 'manager') && (
