@@ -1,6 +1,6 @@
 import React from 'react'
-import { Layout, Menu, theme, Typography, Button, Tag, Space, Badge } from 'antd'
-import { ProjectOutlined, MessageOutlined, MenuFoldOutlined, MenuUnfoldOutlined, UserOutlined } from '@ant-design/icons'
+import { Layout, Menu, theme, Typography, Button, Tag, Space, Badge, Dropdown } from 'antd'
+import { ProjectOutlined, MessageOutlined, MenuFoldOutlined, MenuUnfoldOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import ProjectsPage from './pages/ProjectsPage'
 import TasksPage from './pages/TasksPage'
@@ -9,6 +9,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import UsersPage from './pages/UsersPage'
+import ProfilePage from './pages/ProfilePage'
 import { useAuthStore } from './store/useAuthStore'
 import ChatsPage from './pages/ChatsPage'
 import NotificationsBell from './components/NotificationsBell'
@@ -27,6 +28,7 @@ export default function App() {
     if (p.startsWith('/tasks')) return 'tasks'
     if (p.startsWith('/graph')) return 'graph'
     if (p.startsWith('/users')) return 'users'
+    if (p.startsWith('/profile')) return 'profile'
     return 'projects'
   }, [location.pathname])
   
@@ -63,8 +65,31 @@ export default function App() {
             {auth.user ? (
               <Space>
                 <Tag color="green">{auth.user.role}</Tag>
-                <span style={{ opacity: 0.8 }}>{auth.user.full_name}</span>
-                <Button onClick={() => auth.clearAuth()}>Выйти</Button>
+                <Dropdown
+                  menu={{
+                    items: [
+                      {
+                        key: 'profile',
+                        icon: <UserOutlined />,
+                        label: <Link to="/profile">Мой профиль</Link>,
+                      },
+                      {
+                        type: 'divider',
+                      },
+                      {
+                        key: 'logout',
+                        icon: <LogoutOutlined />,
+                        label: 'Выйти',
+                        onClick: () => auth.clearAuth(),
+                      },
+                    ],
+                  }}
+                  trigger={['click']}
+                >
+                  <Button type="text" icon={<UserOutlined />}>
+                    {auth.user.full_name}
+                  </Button>
+                </Dropdown>
               </Space>
             ) : (
               <Button><Link to="/login">Войти</Link></Button>
@@ -82,6 +107,7 @@ export default function App() {
             <Route path="/graph" element={auth.token ? <GraphPage /> : <Navigate to="/login" replace />} />
             <Route path="/chats" element={auth.token ? <ChatsPage /> : <Navigate to="/login" replace />} />
             <Route path="/users" element={auth.token && auth.user?.role === 'admin' ? <UsersPage /> : <Navigate to="/login" replace />} />
+            <Route path="/profile" element={auth.token ? <ProfilePage /> : <Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to={auth.token ? '/projects' : '/login'} replace />} />
           </Routes>
         </Content>

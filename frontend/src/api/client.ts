@@ -179,4 +179,44 @@ export async function updateUser(userId: number, payload: Partial<{ full_name: s
   return r.json()
 }
 
+export type UserStats = {
+  user: User
+  stats: {
+    total_tasks: number
+    tasks_by_status: {
+      backlog: number
+      in_progress: number
+      review: number
+      done: number
+    }
+    total_projects: number
+  }
+  tasks: Array<{
+    id: number
+    name: string
+    status: Task['status']
+    priority: Task['priority']
+    project_id: number
+    project_name: string
+    duration_plan: number
+    deadline?: string
+    created_at: string
+    updated_at: string
+  }>
+  projects: Array<{
+    id: number
+    name: string
+    description?: string
+    deadline?: string
+    tasks_count: number
+    manager_id?: number
+  }>
+}
+
+export async function getMyStats(): Promise<UserStats> {
+  const r = await fetch(`${API_BASE}/users/me/stats`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to load stats')
+  return r.json()
+}
+
 
