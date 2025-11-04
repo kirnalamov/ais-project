@@ -2,7 +2,7 @@ import { DatePicker, Form, Input, InputNumber, Modal, Select } from 'antd'
 import dayjs from 'dayjs'
 import { useMemo, useState } from 'react'
 
-export default function TaskForm({ open, onOk, onCancel, predecessors, initialValues, title = 'Новая задача', okText = 'Создать' }: { open: boolean; onOk: (values: any) => void; onCancel: () => void; predecessors?: Array<{ id: number; name: string }>; initialValues?: any; title?: string; okText?: string }) {
+export default function TaskForm({ open, onOk, onCancel, predecessors, initialValues, title = 'Новая задача', okText = 'Создать', assignees }: { open: boolean; onOk: (values: any) => void; onCancel: () => void; predecessors?: Array<{ id: number; name: string }>; initialValues?: any; title?: string; okText?: string; assignees?: Array<{ id: number; label: string }> }) {
   const [form] = Form.useForm()
   const [confirmLoading, setConfirmLoading] = useState(false)
   const normalizedInitialValues = useMemo(() => {
@@ -46,6 +46,11 @@ export default function TaskForm({ open, onOk, onCancel, predecessors, initialVa
         <Form.Item label="Приоритет" name="priority">
           <Select options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]} />
         </Form.Item>
+        {assignees && (
+          <Form.Item label="Исполнитель" name="assignee_id">
+            <Select allowClear placeholder="Выберите исполнителя" options={assignees.map(a => ({ value: a.id, label: a.label }))} />
+          </Form.Item>
+        )}
         <Form.Item label="Дедлайн" name="deadline">
           <DatePicker style={{ width: '100%' }} format={'YYYY-MM-DD'} />
         </Form.Item>

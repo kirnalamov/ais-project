@@ -51,13 +51,16 @@ export default function GanttView({ projectId, apiBase }: { projectId: number; a
 
   useEffect(() => {
     if (!projectId) return
-    fetch(`${apiBase}/analysis/projects/${projectId}/graph`)
-      .then((r) => {
-        if (!r.ok) throw new Error('Failed to load graph')
-        return r.json()
-      })
+    const load = () => fetch(`${apiBase}/analysis/projects/${projectId}/graph`)
+      .then((r) => { if (!r.ok) throw new Error('Failed to load graph'); return r.json() })
       .then((g: GraphAnalysis) => setData(g))
       .catch(() => setData(null))
+    load()
+    // Subscribe to SSE for live updates
+    const sse = new EventSource(`${apiBase}/events/projects/${projectId}/stream`)
+    sse.onmessage = () => load()
+    sse.onerror = () => { /* silently fallback */ }
+    return () => sse.close()
   }, [projectId, apiBase])
 
   const rows = useMemo(() => {
@@ -235,7 +238,7 @@ export default function GanttView({ projectId, apiBase }: { projectId: number; a
               return (
                 <g key={n.id} filter={isCrit ? 'url(#crit-glow)' : 'url(#soft-shadow)'}>
                   <rect x={x} y={y} width={w} height={h} rx={8} ry={8} fill={s.fill} stroke={isCrit ? '#ff4d4f' : s.border} strokeWidth={2} />
-                  <clipPath id={`clip-${n.id}`}><rect x={x + 8} y={y + 4} width={w - 16} height={h - 8} rx={6} ry={6} /></clipPath>
+                  <clipPath id={`clip-${n.id}`}><rect x={x + 8} y={y + 4} width={Math.max(1, w - 16)} height={Math.max(1, h - 8)} rx={6} ry={6} /></clipPath>
                   <text x={x + w / 2} y={y + h / 2 + 4} textAnchor="middle" fill={s.text} fontWeight={700} fontSize={12} fontFamily="Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial" clipPath={`url(#clip-${n.id})`}>
                     {n.duration} ед.
                     <title>{`ID #${n.id} · ${n.name}`}</title>

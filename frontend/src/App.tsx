@@ -1,11 +1,14 @@
 import React from 'react'
-import { Layout, Menu, theme, Typography, Button } from 'antd'
+import { Layout, Menu, theme, Typography, Button, Tag, Space } from 'antd'
 import { ProjectOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import ProjectsPage from './pages/ProjectsPage'
 import TasksPage from './pages/TasksPage'
 import GraphPage from './pages/GraphPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+import { useAuthStore } from './store/useAuthStore'
 
 const { Header, Sider, Content } = Layout
 
@@ -13,6 +16,7 @@ export default function App() {
   const location = useLocation()
   const { token } = theme.useToken()
   const [collapsed, setCollapsed] = React.useState(false)
+  const auth = useAuthStore()
   const selectedKey = 'projects'
   const menuItems = [
     { key: 'projects', icon: <ProjectOutlined />, label: <Link to="/projects">Проекты</Link> }
@@ -24,17 +28,32 @@ export default function App() {
         <Menu theme="dark" mode="inline" selectedKeys={[selectedKey]} items={menuItems} />
       </Sider>
       <Layout>
-        <Header style={{ background: token.colorBgElevated, borderBottom: `1px solid ${token.colorBorder}`, paddingInline: 12, display: 'flex', alignItems: 'center', gap: 12, height: 52, lineHeight: '52px' }}>
-          <Button type="text" style={{ color: token.colorText }} icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setCollapsed(!collapsed)} />
-          <Typography.Title level={4} style={{ margin: 0, color: token.colorText }}>Корпоративный планировщик задач</Typography.Title>
+        <Header style={{ background: token.colorBgElevated, borderBottom: `1px solid ${token.colorBorder}`, paddingInline: 12, display: 'flex', alignItems: 'center', gap: 12, height: 52, lineHeight: '52px', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Button type="text" style={{ color: token.colorText }} icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setCollapsed(!collapsed)} />
+            <Typography.Title level={4} style={{ margin: 0, color: token.colorText }}>Корпоративный планировщик задач</Typography.Title>
+          </div>
+          <div>
+            {auth.user ? (
+              <Space>
+                <Tag color="green">{auth.user.role}</Tag>
+                <span style={{ opacity: 0.8 }}>{auth.user.full_name}</span>
+                <Button onClick={() => auth.clearAuth()}>Выйти</Button>
+              </Space>
+            ) : (
+              <Button><Link to="/login">Войти</Link></Button>
+            )}
+          </div>
         </Header>
         <Content style={{ margin: 16 }}>
           <Routes>
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/projects/:id" element={<ProjectDetailPage />} />
-            <Route path="/tasks" element={<TasksPage />} />
-            <Route path="/graph" element={<GraphPage />} />
-            <Route path="*" element={<Navigate to="/projects" replace />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/projects" element={auth.token ? <ProjectsPage /> : <Navigate to="/login" replace />} />
+            <Route path="/projects/:id" element={auth.token ? <ProjectDetailPage /> : <Navigate to="/login" replace />} />
+            <Route path="/tasks" element={auth.token ? <TasksPage /> : <Navigate to="/login" replace />} />
+            <Route path="/graph" element={auth.token ? <GraphPage /> : <Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to={auth.token ? '/projects' : '/login'} replace />} />
           </Routes>
         </Content>
       </Layout>

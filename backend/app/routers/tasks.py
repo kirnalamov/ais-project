@@ -1,10 +1,13 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.background import BackgroundTasks
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from .. import models, schemas
+from ..auth import get_current_user, require_roles
+from ..events import notify_project
 from pydantic import BaseModel
 from typing import List
 
@@ -13,7 +16,27 @@ router = APIRouter()
 
 
 @router.get("/", response_model=List[schemas.TaskOut])
-def list_tasks(project_id: int = Query(...), db: Session = Depends(get_db)):
+def list_tasks(
+    project_id: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    # Verify access to project
+    project = db.query(models.Project).get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if current_user.role != models.UserRole.admin:
+        if current_user.role == models.UserRole.manager and project.manager_id == current_user.id:
+            pass
+        else:
+            is_member = (
+                db.query(models.ProjectMember)
+                .filter(models.ProjectMember.project_id == project_id, models.ProjectMember.user_id == current_user.id)
+                .first()
+                is not None
+            )
+            if not is_member:
+                raise HTTPException(status_code=403, detail="Нет доступа к задачам проекта")
     return (
         db.query(models.Task)
         .filter(models.Task.project_id == project_id)
@@ -23,21 +46,44 @@ def list_tasks(project_id: int = Query(...), db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=schemas.TaskOut)
-def create_task(payload: schemas.TaskCreate, db: Session = Depends(get_db)):
+def create_task(
+    payload: schemas.TaskCreate,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_roles(models.UserRole.admin, models.UserRole.manager)),
+    background_tasks: BackgroundTasks = None,
+):
     # Ensure project exists
     project = db.query(models.Project).get(payload.project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    # Ensure assignee is project member if provided
+    if payload.assignee_id is not None:
+        member = (
+            db.query(models.ProjectMember)
+            .filter(
+                models.ProjectMember.project_id == payload.project_id,
+                models.ProjectMember.user_id == payload.assignee_id,
+            )
+            .first()
+        )
+        if member is None:
+            raise HTTPException(status_code=400, detail="Исполнитель не состоит в проекте")
 
     task = models.Task(**payload.model_dump())
     db.add(task)
     db.commit()
     db.refresh(task)
+    if background_tasks is not None:
+        background_tasks.add_task(notify_project, task.project_id, "task_created")
     return task
 
 
 @router.post("/dependencies", response_model=schemas.DependencyOut)
-def add_dependency(payload: schemas.DependencyCreate, db: Session = Depends(get_db)):
+def add_dependency(
+    payload: schemas.DependencyCreate,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_roles(models.UserRole.admin, models.UserRole.manager)),
+):
     if payload.task_id == payload.depends_on_task_id:
         raise HTTPException(status_code=400, detail="Task cannot depend on itself")
 
@@ -71,11 +117,50 @@ class TaskUpdatePayload(BaseModel):
 
 
 @router.patch("/{task_id}", response_model=schemas.TaskOut)
-def update_task(task_id: int, payload: TaskUpdatePayload, db: Session = Depends(get_db)):
+def update_task(
+    task_id: int,
+    payload: TaskUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+    background_tasks: BackgroundTasks = None,
+):
     task = db.query(models.Task).get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     data = payload.model_dump(exclude_unset=True)
+
+    # Permissions: executors can update only their tasks and limited fields
+    if current_user.role == models.UserRole.executor:
+        if task.assignee_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Можно изменять только свои задачи")
+        allowed_fields = {"status", "description"}
+        data = {k: v for k, v in data.items() if k in allowed_fields}
+
+    # Managers must manage the project or be a member
+    if current_user.role == models.UserRole.manager:
+        project = db.query(models.Project).get(task.project_id)
+        if not project or project.manager_id != current_user.id:
+            is_member = (
+                db.query(models.ProjectMember)
+                .filter(models.ProjectMember.project_id == task.project_id, models.ProjectMember.user_id == current_user.id)
+                .first()
+                is not None
+            )
+            if not is_member:
+                raise HTTPException(status_code=403, detail="Нет доступа")
+
+    # If assignee_id is being changed, ensure membership
+    if "assignee_id" in data and data["assignee_id"] is not None:
+        member = (
+            db.query(models.ProjectMember)
+            .filter(
+                models.ProjectMember.project_id == task.project_id,
+                models.ProjectMember.user_id == data["assignee_id"],
+            )
+            .first()
+        )
+        if member is None:
+            raise HTTPException(status_code=400, detail="Исполнитель не состоит в проекте")
 
     # Enforce dependency rule: a task cannot be started or completed
     # unless all its predecessors are done
@@ -107,11 +192,17 @@ def update_task(task_id: int, payload: TaskUpdatePayload, db: Session = Depends(
     db.add(task)
     db.commit()
     db.refresh(task)
+    if background_tasks is not None:
+        background_tasks.add_task(notify_project, task.project_id, "task_updated")
     return task
 
 
 @router.get("/{task_id}/dependencies", response_model=List[schemas.DependencyOut])
-def list_task_dependencies(task_id: int, db: Session = Depends(get_db)):
+def list_task_dependencies(
+    task_id: int,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
     return (
         db.query(models.TaskDependency)
         .filter(models.TaskDependency.task_id == task_id)
@@ -125,7 +216,13 @@ class TaskDependenciesPayload(BaseModel):
 
 
 @router.put("/{task_id}/dependencies", response_model=List[schemas.DependencyOut])
-def replace_task_dependencies(task_id: int, payload: TaskDependenciesPayload, db: Session = Depends(get_db)):
+def replace_task_dependencies(
+    task_id: int,
+    payload: TaskDependenciesPayload,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_roles(models.UserRole.admin, models.UserRole.manager)),
+    background_tasks: BackgroundTasks = None,
+):
     task = db.query(models.Task).get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -154,7 +251,85 @@ def replace_task_dependencies(task_id: int, payload: TaskDependenciesPayload, db
     db.commit()
     for d in new_deps:
         db.refresh(d)
+    if background_tasks is not None:
+        background_tasks.add_task(notify_project, task.project_id, "deps_updated")
     return new_deps
+
+
+@router.get("/{task_id}/messages", response_model=List[schemas.TaskMessageOut])
+def list_task_messages(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    task = db.query(models.Task).get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if current_user.role != models.UserRole.admin:
+        project = db.query(models.Project).get(task.project_id)
+        allowed = False
+        if project and project.manager_id == current_user.id:
+            allowed = True
+        # allow project managers who are members even if not manager_id
+        if current_user.role == models.UserRole.manager and not allowed:
+            is_member = (
+                db.query(models.ProjectMember)
+                .filter(models.ProjectMember.project_id == task.project_id, models.ProjectMember.user_id == current_user.id)
+                .first()
+                is not None
+            )
+            if is_member:
+                allowed = True
+        if task.assignee_id == current_user.id:
+            allowed = True
+        if not allowed:
+            raise HTTPException(status_code=403, detail="Нет доступа к чату задачи")
+    msgs = (
+        db.query(models.TaskMessage)
+        .filter(models.TaskMessage.task_id == task_id)
+        .order_by(models.TaskMessage.created_at.asc())
+        .all()
+    )
+    return msgs
+
+
+@router.post("/{task_id}/messages", response_model=schemas.TaskMessageOut)
+def send_task_message(
+    task_id: int,
+    payload: schemas.TaskMessageCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+    background_tasks: BackgroundTasks = None,
+):
+    task = db.query(models.Task).get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if current_user.role != models.UserRole.admin:
+        project = db.query(models.Project).get(task.project_id)
+        allowed = False
+        if project and project.manager_id == current_user.id:
+            allowed = True
+        # allow project managers who are members even if not manager_id
+        if current_user.role == models.UserRole.manager and not allowed:
+            is_member = (
+                db.query(models.ProjectMember)
+                .filter(models.ProjectMember.project_id == task.project_id, models.ProjectMember.user_id == current_user.id)
+                .first()
+                is not None
+            )
+            if is_member:
+                allowed = True
+        if task.assignee_id == current_user.id:
+            allowed = True
+        if not allowed:
+            raise HTTPException(status_code=403, detail="Нет доступа к чату задачи")
+    msg = models.TaskMessage(task_id=task_id, author_id=current_user.id, content=payload.content)
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+    if background_tasks is not None:
+        background_tasks.add_task(notify_project, task.project_id, "message")
+    return msg
 
 
 
