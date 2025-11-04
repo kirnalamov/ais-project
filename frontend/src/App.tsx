@@ -31,6 +31,7 @@ export default function App() {
     { key: 'projects', icon: <ProjectOutlined />, label: <Link to="/projects">Проекты</Link> },
     { key: 'chats', icon: <MessageOutlined />, label: <Link to="/chats">Чаты</Link> }
   ]
+
   return (
     <Layout style={{ minHeight: '100vh', position: 'relative' }} className="app-grid-bg">
       <Sider collapsible collapsed={collapsed} trigger={false} breakpoint="lg" collapsedWidth="0">
@@ -64,6 +65,7 @@ export default function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/projects" element={auth.token ? <ProjectsPage /> : <Navigate to="/login" replace />} />
             <Route path="/projects/:id" element={auth.token ? <ProjectDetailPage /> : <Navigate to="/login" replace />} />
+            <Route path="/projects/:id/graph" element={auth.token ? <GraphPage /> : <Navigate to="/login" replace />} />
             <Route path="/tasks" element={auth.token ? <TasksPage /> : <Navigate to="/login" replace />} />
             <Route path="/graph" element={auth.token ? <GraphPage /> : <Navigate to="/login" replace />} />
             <Route path="/chats" element={auth.token ? <ChatsPage /> : <Navigate to="/login" replace />} />

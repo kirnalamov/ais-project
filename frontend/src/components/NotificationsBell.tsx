@@ -58,17 +58,48 @@ export default function NotificationsBell() {
       if (current.has(pid)) return
       const es = new EventSource(`${API_BASE}/events/projects/${pid}/stream`)
       es.onmessage = async (e) => {
-        const kind = String(e.data || '')
+        const rawData = String(e.data || '')
+        
+        // Try to parse as JSON (new detailed format)
+        let eventData: any = null
+        try {
+          eventData = JSON.parse(rawData)
+        } catch {
+          // Fallback to old string-based format
+          eventData = { kind: rawData, project_id: pid }
+        }
+
+        const { kind, project_id, project_name, user_name, task_id, task_name, old_status, new_status } = eventData
+        const projectDisplay = project_name || `проект #${project_id || pid}`
+        const userDisplay = user_name || 'Пользователь'
+        const taskDisplay = task_name || `задача #${task_id}`
+
         if (kind === 'message') {
-          add({ type: 'message', text: `Новое сообщение в проекте #${pid}`, link: '/chats' })
+          add({
+            type: 'message',
+            text: `${userDisplay} написал(а) в чате по ${taskDisplay} (${projectDisplay})`,
+            link: '/chats',
+            meta: eventData
+          })
         } else if (kind === 'task_created') {
-          add({ type: 'task', text: `Создана новая задача в проекте #${pid}`, link: '/projects' })
+          add({
+            type: 'task',
+            text: `Создана новая задача "${taskDisplay}" в ${projectDisplay}`,
+            link: '/projects',
+            meta: eventData
+          })
         } else if (kind === 'task_updated') {
-          add({ type: 'task', text: `Обновлён статус задачи в проекте #${pid}`, link: '/projects' })
+          const statusText = new_status ? ` → ${new_status}` : ''
+          add({
+            type: 'task',
+            text: `${userDisplay} обновил(а) ${taskDisplay}${statusText} (${projectDisplay})`,
+            link: '/projects',
+            meta: eventData
+          })
           // Detect unblocked tasks for current user within this project
           try {
             if (!userId) return
-            const tasks = await listTasks(pid)
+            const tasks = await listTasks(project_id || pid)
             const byId: Record<number, Task> = Object.fromEntries(tasks.map((t) => [t.id, t]))
             const myTodo = tasks.filter((t) => t.assignee_id === userId && t.status === 'backlog')
             for (const t of myTodo) {
@@ -76,14 +107,29 @@ export default function NotificationsBell() {
               const allDone = deps.every((d) => byId[d.depends_on_task_id]?.status === 'done')
               if (allDone && !unblockedNotifiedRef.current.has(t.id)) {
                 unblockedNotifiedRef.current.add(t.id)
-                add({ type: 'deps', text: `Можно начинать задачу #${t.id} (проект #${pid})`, link: '/tasks' })
+                add({
+                  type: 'deps',
+                  text: `Можно начинать задачу #${t.id} (${projectDisplay})`,
+                  link: '/tasks',
+                  meta: { task_id: t.id, project_id: project_id || pid }
+                })
               }
             }
           } catch {}
         } else if (kind === 'deps_updated') {
-          add({ type: 'deps', text: `Обновлены зависимости задач (проект #${pid})`, link: '/projects' })
+          add({
+            type: 'deps',
+            text: `Обновлены зависимости ${taskDisplay} (${projectDisplay})`,
+            link: '/projects',
+            meta: eventData
+          })
         } else {
-          add({ type: 'info', text: `Обновления в проекте #${pid}`, link: '/projects' })
+          add({
+            type: 'info',
+            text: `Обновления в ${projectDisplay}`,
+            link: '/projects',
+            meta: eventData
+          })
         }
       }
       es.onerror = () => {
@@ -109,6 +155,25 @@ export default function NotificationsBell() {
     markAllRead()
   }
 
+  const handleNotificationClick = (n: typeof notifications[0]) => {
+    setOpen(false)
+    
+    // Handle different notification types with intelligent navigation
+    if (n.meta?.kind === 'message' && n.meta?.task_id) {
+      // Navigate to chats page with selected task
+      navigate(`/chats?taskId=${n.meta.task_id}`)
+    } else if (n.meta?.kind === 'task_updated' && n.meta?.task_id && n.meta?.project_id) {
+      // Navigate to graph page and highlight task
+      navigate(`/projects/${n.meta.project_id}/graph?highlight=${n.meta.task_id}`)
+    } else if (n.meta?.kind === 'task_created' && n.meta?.project_id) {
+      // Navigate to project detail
+      navigate(`/projects/${n.meta.project_id}`)
+    } else if (n.link) {
+      // Fallback to generic link
+      navigate(n.link)
+    }
+  }
+
   return (
     <>
       <Badge count={unread} overflowCount={99} size="small">
@@ -118,7 +183,10 @@ export default function NotificationsBell() {
         <List
           dataSource={notifications}
           renderItem={(n) => (
-            <List.Item style={{ border: 'none' }} onClick={() => { if (n.link) navigate(n.link); setOpen(false) }}>
+            <List.Item 
+              style={{ border: 'none', cursor: 'pointer' }} 
+              onClick={() => handleNotificationClick(n)}
+            >
               <Space direction="vertical" size={2}>
                 <Typography.Text>{n.text}</Typography.Text>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>{new Date(n.ts).toLocaleString()}</Typography.Text>

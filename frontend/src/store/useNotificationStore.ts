@@ -7,7 +7,18 @@ export type AppNotification = {
   ts: number
   read: boolean
   link?: string
-  meta?: any
+  meta?: {
+    kind?: string
+    project_id?: number
+    project_name?: string
+    user_id?: number
+    user_name?: string
+    task_id?: number
+    task_name?: string
+    old_status?: string
+    new_status?: string
+    [key: string]: any
+  }
 }
 
 type NotificationState = {

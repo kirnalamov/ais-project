@@ -1,6 +1,7 @@
 import asyncio
+import json
 from collections import defaultdict
-from typing import AsyncGenerator, Dict, Set
+from typing import AsyncGenerator, Dict, Set, Any, Optional
 
 
 class ProjectEventBus:
@@ -48,7 +49,36 @@ async def project_sse_stream(project_id: int) -> AsyncGenerator[bytes, None]:
         await bus.unsubscribe(project_id, queue)
 
 
-async def notify_project(project_id: int, kind: str = "updated") -> None:
-    await bus.publish(project_id, kind)
+async def notify_project(
+    project_id: int,
+    kind: str = "updated",
+    user_id: Optional[int] = None,
+    user_name: Optional[str] = None,
+    task_id: Optional[int] = None,
+    task_name: Optional[str] = None,
+    project_name: Optional[str] = None,
+    old_status: Optional[str] = None,
+    new_status: Optional[str] = None,
+    extra: Optional[Dict[str, Any]] = None
+) -> None:
+    """Send detailed notification event to all project subscribers."""
+    event_data = {
+        "kind": kind,
+        "project_id": project_id,
+        "project_name": project_name,
+        "user_id": user_id,
+        "user_name": user_name,
+        "task_id": task_id,
+        "task_name": task_name,
+        "old_status": old_status,
+        "new_status": new_status,
+    }
+    if extra:
+        event_data.update(extra)
+    
+    # Remove None values
+    event_data = {k: v for k, v in event_data.items() if v is not None}
+    
+    await bus.publish(project_id, json.dumps(event_data))
 
 

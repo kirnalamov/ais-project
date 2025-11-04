@@ -45,6 +45,39 @@ def list_tasks(
     )
 
 
+@router.get("/{task_id}", response_model=schemas.TaskOut)
+def get_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    task = db.query(models.Task).get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Check access
+    if current_user.role != models.UserRole.admin:
+        project = db.query(models.Project).get(task.project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Manager of project has access
+        if current_user.role == models.UserRole.manager and project.manager_id == current_user.id:
+            pass
+        else:
+            # Check if user is a member of the project
+            is_member = (
+                db.query(models.ProjectMember)
+                .filter(models.ProjectMember.project_id == task.project_id, models.ProjectMember.user_id == current_user.id)
+                .first()
+                is not None
+            )
+            if not is_member:
+                raise HTTPException(status_code=403, detail="Нет доступа к задаче")
+    
+    return task
+
+
 @router.post("/", response_model=schemas.TaskOut)
 def create_task(
     payload: schemas.TaskCreate,
@@ -74,7 +107,20 @@ def create_task(
     db.commit()
     db.refresh(task)
     if background_tasks is not None:
-        background_tasks.add_task(notify_project, task.project_id, "task_created")
+        assignee_name = None
+        if task.assignee_id:
+            assignee = db.query(models.User).get(task.assignee_id)
+            assignee_name = assignee.full_name if assignee else None
+        background_tasks.add_task(
+            notify_project,
+            task.project_id,
+            "task_created",
+            user_id=assignee.id if assignee_name else None,
+            user_name=assignee_name,
+            task_id=task.id,
+            task_name=task.name,
+            project_name=project.name
+        )
     return task
 
 
@@ -190,13 +236,27 @@ def update_task(
             detail="Нельзя завершить задачу, которая не находится в статусе 'in_progress'",
         )
 
+    old_status = task.status.value if hasattr(task.status, 'value') else str(task.status)
     for k, v in data.items():
         setattr(task, k, v)
     db.add(task)
     db.commit()
     db.refresh(task)
     if background_tasks is not None:
-        background_tasks.add_task(notify_project, task.project_id, "task_updated")
+        project = db.query(models.Project).get(task.project_id)
+        new_status_val = task.status.value if hasattr(task.status, 'value') else str(task.status)
+        background_tasks.add_task(
+            notify_project,
+            task.project_id,
+            "task_updated",
+            user_id=current_user.id,
+            user_name=current_user.full_name,
+            task_id=task.id,
+            task_name=task.name,
+            project_name=project.name if project else None,
+            old_status=old_status,
+            new_status=new_status_val
+        )
     return task
 
 
@@ -255,7 +315,15 @@ def replace_task_dependencies(
     for d in new_deps:
         db.refresh(d)
     if background_tasks is not None:
-        background_tasks.add_task(notify_project, task.project_id, "deps_updated")
+        project = db.query(models.Project).get(task.project_id)
+        background_tasks.add_task(
+            notify_project,
+            task.project_id,
+            "deps_updated",
+            task_id=task_id,
+            task_name=task.name,
+            project_name=project.name if project else None
+        )
     return new_deps
 
 
@@ -331,7 +399,17 @@ def send_task_message(
     db.commit()
     db.refresh(msg)
     if background_tasks is not None:
-        background_tasks.add_task(notify_project, task.project_id, "message")
+        project = db.query(models.Project).get(task.project_id)
+        background_tasks.add_task(
+            notify_project,
+            task.project_id,
+            "message",
+            user_id=current_user.id,
+            user_name=current_user.full_name,
+            task_id=task_id,
+            task_name=task.name,
+            project_name=project.name if project else None
+        )
     return msg
 
 

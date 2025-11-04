@@ -73,6 +73,12 @@ export async function listTasks(projectId: number): Promise<Task[]> {
   return r.json()
 }
 
+export async function getTask(taskId: number): Promise<Task> {
+  const r = await fetch(`${API_BASE}/tasks/${taskId}`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to load task')
+  return r.json()
+}
+
 export async function createTask(payload: { name: string; description?: string; project_id: number; assignee_id?: number; status?: string; priority?: string; duration_plan: number; deadline?: string }): Promise<Task> {
   const r = await fetch(`${API_BASE}/tasks/`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(payload) })
   if (!r.ok) throw new Error('Failed to create task')

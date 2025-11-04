@@ -185,7 +185,7 @@ function GradientBezierEdge(props: EdgeProps) {
 
 const edgeTypes = { gradient: GradientBezierEdge }
 
-export default function GraphView({ projectId, apiBase, readonly = false, showDuration = true }: { projectId: number, apiBase: string, readonly?: boolean; showDuration?: boolean }) {
+export default function GraphView({ projectId, apiBase, readonly = false, showDuration = true, highlightTaskId }: { projectId: number, apiBase: string, readonly?: boolean; showDuration?: boolean; highlightTaskId?: number }) {
   const [data, setData] = useState<GraphAnalysis | null>(null)
   const [hoverNode, setHoverNode] = useState<GraphNode | null>(null)
   const [clickNode, setClickNode] = useState<GraphNode | null>(null)
@@ -200,6 +200,7 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
   const [membersMap, setMembersMap] = useState<Record<number, { id: number; full_name: string }>>({})
   const criticalSet = useMemo(() => new Set<number>(data?.critical_path || []), [data])
   const auth = useAuthStore()
+  const highlightAppliedRef = useRef<boolean>(false)
   const canAct = useMemo(() => {
     if (!data || !clickNode) return { canStart: true, canDone: true }
     // Admin can perform any action
@@ -261,7 +262,20 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
   useEffect(() => {
     setNodes(initialNodes)
     setEdges(initialEdges)
+    highlightAppliedRef.current = false
   }, [initialNodes, initialEdges, setNodes, setEdges])
+
+  // Auto-highlight task if highlightTaskId is provided
+  useEffect(() => {
+    if (!highlightTaskId || !data || highlightAppliedRef.current || readonly) return
+    const taskNode = data.nodes.find(n => n.id === highlightTaskId)
+    const rfNode = nodes.find(n => n.id === String(highlightTaskId))
+    if (taskNode && rfNode) {
+      highlightAppliedRef.current = true
+      setClickNode(taskNode)
+      setClickNodeMeta(rfNode)
+    }
+  }, [highlightTaskId, data, nodes, readonly])
 
   // Keep floating panel next to node and inside viewport
   useEffect(() => {

@@ -1,13 +1,20 @@
 import { Button, Card, Empty, Flex, Typography } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import GraphView from '../components/GraphView'
 import { useProjectStore } from '../store/useProjectStore'
 
 export default function GraphPage({ readonly = false, hideTitle = false, showDuration = true }: { readonly?: boolean; hideTitle?: boolean; showDuration?: boolean } = {}) {
   const { selectedProjectId } = useProjectStore()
+  const { id: paramProjectId } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
   const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
   const navigate = useNavigate()
+  
+  // Use projectId from URL param if available, otherwise from store
+  const projectId = paramProjectId ? parseInt(paramProjectId, 10) : selectedProjectId
+  const highlightTaskId = searchParams.get('highlight') ? parseInt(searchParams.get('highlight')!, 10) : undefined
+  
   return (
     <Flex vertical gap={16}>
       {!hideTitle && (
@@ -17,8 +24,14 @@ export default function GraphPage({ readonly = false, hideTitle = false, showDur
         </Flex>
       )}
       <Card styles={{ body: { padding: 0 } }}>
-        {selectedProjectId ? (
-          <GraphView projectId={selectedProjectId} apiBase={API_BASE} readonly={readonly} showDuration={showDuration} />
+        {projectId ? (
+          <GraphView 
+            projectId={projectId} 
+            apiBase={API_BASE} 
+            readonly={readonly} 
+            showDuration={showDuration}
+            highlightTaskId={highlightTaskId}
+          />
         ) : (
           <Empty description="Выберите проект на странице Проекты" />
         )}
