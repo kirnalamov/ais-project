@@ -17,11 +17,37 @@ router = APIRouter()
 
 @router.get("/", response_model=List[schemas.TaskOut])
 def list_tasks(
-    project_id: int = Query(...),
+    project_id: int = Query(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    # Verify access to project
+    # If no project_id specified, return all tasks user has access to
+    if project_id is None:
+        if current_user.role == models.UserRole.admin:
+            # Admin sees all tasks
+            return db.query(models.Task).order_by(models.Task.id).all()
+        elif current_user.role == models.UserRole.manager:
+            # Manager sees tasks from projects they manage or are member of
+            return (
+                db.query(models.Task)
+                .join(models.Project, models.Project.id == models.Task.project_id)
+                .outerjoin(models.ProjectMember, models.ProjectMember.project_id == models.Project.id)
+                .filter((models.Project.manager_id == current_user.id) | (models.ProjectMember.user_id == current_user.id))
+                .order_by(models.Task.id)
+                .all()
+            )
+        else:
+            # Executor sees tasks from projects they are member of
+            return (
+                db.query(models.Task)
+                .join(models.Project, models.Project.id == models.Task.project_id)
+                .join(models.ProjectMember, models.ProjectMember.project_id == models.Project.id)
+                .filter(models.ProjectMember.user_id == current_user.id)
+                .order_by(models.Task.id)
+                .all()
+            )
+    
+    # If project_id is specified, verify access and return tasks for that project
     project = db.query(models.Project).get(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

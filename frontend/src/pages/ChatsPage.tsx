@@ -1,33 +1,38 @@
-import { Avatar, Badge, Button, Card, Empty, Flex, Input, List, Space, Typography } from 'antd'
+import { Avatar, Badge, Button, Card, Empty, Flex, Input, List, Space, Typography, Select } from 'antd'
 import { ArrowLeftOutlined, ReloadOutlined, MessageOutlined, SendOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { listProjectMembers, listTasks, listTaskMessages, Task, sendTaskMessage } from '../api/client'
-import { useProjectStore } from '../store/useProjectStore'
+import { listTasks, listTaskMessages, Task, sendTaskMessage, listProjects, type Project } from '../api/client'
 import { useAuthStore } from '../store/useAuthStore'
 import { useChatStore } from '../store/useChatStore'
 
-function useTasks(projectId: number | null) {
+function useAllTasks() {
   return useQuery({
-    queryKey: ['tasks', projectId],
-    queryFn: () => listTasks(projectId!),
-    enabled: !!projectId,
-    refetchInterval: 4000
+    queryKey: ['allTasks'],
+    queryFn: () => listTasks(),
+    // No polling - we use SSE for real-time updates
+  })
+}
+
+function useProjects() {
+  return useQuery({
+    queryKey: ['projects'],
+    queryFn: listProjects,
   })
 }
 
 export default function ChatsPage() {
-  const { selectedProjectId } = useProjectStore()
-  const { data, isLoading } = useTasks(selectedProjectId)
+  const { data, isLoading } = useAllTasks()
+  const { data: projects } = useProjects()
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const role = useAuthStore(s => s.user?.role)
   const userId = useAuthStore(s => s.user?.id || null)
   const meId = useAuthStore(s => s.user?.id || null)
-  const [isMember, setIsMember] = useState<boolean>(false)
   const [search, setSearch] = useState<string>('')
+  const [selectedProjectFilter, setSelectedProjectFilter] = useState<number | 'all'>('all')
   const [chatTaskId, setChatTaskId] = useState<number | null>(null)
   const getLastReadAt = useChatStore(s => s.getLastReadAt)
   const markTaskRead = useChatStore(s => s.markTaskRead)
@@ -36,27 +41,42 @@ export default function ChatsPage() {
   const [text, setText] = useState('')
   const messagesRef = useRef<HTMLDivElement>(null)
 
-  async function loadMembers() {
-    if (!selectedProjectId) return
-    const members = await listProjectMembers(selectedProjectId)
-    const uid = userId
-    setIsMember(!!uid && members.some((m: any) => m.user.id === uid))
-  }
-
-  useEffect(() => { loadMembers() }, [selectedProjectId])
-
   const canChatFor = useMemo(() => (t: Task) => {
     if (!role) return false
     if (role === 'admin') return true
-    if (role === 'manager') return isMember
+    if (role === 'manager') return true
     if (role === 'executor') return !!userId && t.assignee_id === userId
     return false
-  }, [role, isMember, userId])
+  }, [role, userId])
 
-  const rows = useMemo(() => (data || []).filter(canChatFor), [data, canChatFor])
+  const rows = useMemo(() => {
+    let filtered = (data || []).filter(canChatFor)
+    
+    // Filter by project if selected
+    if (selectedProjectFilter !== 'all') {
+      filtered = filtered.filter(t => t.project_id === selectedProjectFilter)
+    }
+    
+    // Sort by last message timestamp (newest first)
+    filtered.sort((a, b) => {
+      const tsA = lastMeta[a.id]?.ts || 0
+      const tsB = lastMeta[b.id]?.ts || 0
+      return tsB - tsA // Descending order (newest first)
+    })
+    
+    return filtered
+  }, [data, canChatFor, selectedProjectFilter, lastMeta])
+  
+  // Create project map for displaying project names
+  const projectMap = useMemo(() => {
+    const map: Record<number, Project> = {}
+    if (projects) {
+      projects.forEach(p => map[p.id] = p)
+    }
+    return map
+  }, [projects])
 
   async function loadLastMessages(tasks: Task[]) {
-    if (!selectedProjectId) return
     const next: Record<number, { preview: string; ts: number; unread: number }> = {}
     await Promise.all(tasks.map(async (t) => {
       try {
@@ -79,7 +99,58 @@ export default function ChatsPage() {
       setLastMeta({})
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows.map(r => r.id).join(','), selectedProjectId])
+  }, [rows.map(r => r.id).join(',')])
+
+  // Subscribe to SSE events for real-time updates
+  useEffect(() => {
+    if (!projects || projects.length === 0) return
+    
+    const eventSources: EventSource[] = []
+    const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+    
+    // Subscribe to all user's projects
+    projects.forEach(project => {
+      const es = new EventSource(`${API_BASE}/events/projects/${project.id}/stream`)
+      
+      es.onmessage = async (e) => {
+        try {
+          const eventData = JSON.parse(e.data)
+          
+          // Handle message events
+          if (eventData.kind === 'message' && eventData.task_id) {
+            // Update metadata for this specific chat
+            const task = rows.find(t => t.id === eventData.task_id)
+            if (task) {
+              await loadLastMessages([task])
+            }
+            
+            // If this is the active chat, reload messages
+            if (chatTaskId === eventData.task_id) {
+              await loadChatMessages()
+            }
+          }
+          
+          // Handle task updates (new tasks, status changes, etc)
+          if (eventData.kind === 'task_created' || eventData.kind === 'task_updated') {
+            // Refresh the tasks list
+            qc.invalidateQueries({ queryKey: ['allTasks'] })
+          }
+        } catch (err) {
+          // Ignore parse errors for non-JSON events
+        }
+      }
+      
+      es.onerror = () => {
+        // Silent fail, will retry automatically
+      }
+      
+      eventSources.push(es)
+    })
+    
+    return () => {
+      eventSources.forEach(es => es.close())
+    }
+  }, [projects, rows, chatTaskId, qc])
 
   // Check URL params for taskId
   useEffect(() => {
@@ -108,8 +179,6 @@ export default function ChatsPage() {
   useEffect(() => {
     if (chatTaskId) {
       loadChatMessages()
-      const interval = setInterval(() => loadChatMessages(), 3000)
-      return () => clearInterval(interval)
     }
   }, [chatTaskId])
 
@@ -118,6 +187,8 @@ export default function ChatsPage() {
     await sendTaskMessage(chatTaskId, text.trim())
     setText('')
     await loadChatMessages()
+    // Immediately update last messages metadata
+    await loadLastMessages([rows.find(t => t.id === chatTaskId)].filter(Boolean) as Task[])
   }
 
   const selectChat = (taskId: number) => {
@@ -136,6 +207,16 @@ export default function ChatsPage() {
           <Typography.Title level={3} style={{ margin: 0 }}>Чаты задач</Typography.Title>
         </Flex>
         <Flex gap={8}>
+          <Select
+            placeholder="Все проекты"
+            value={selectedProjectFilter}
+            onChange={setSelectedProjectFilter}
+            style={{ width: 200 }}
+            options={[
+              { value: 'all', label: 'Все проекты' },
+              ...(projects || []).map(p => ({ value: p.id, label: p.name }))
+            ]}
+          />
           <Input
             placeholder="Поиск"
             value={search}
@@ -146,12 +227,11 @@ export default function ChatsPage() {
             name="chat-search"
             id="chat-search"
           />
-          <Button icon={<ReloadOutlined />} onClick={() => qc.invalidateQueries({ queryKey: ['tasks', selectedProjectId] })} disabled={!selectedProjectId}>Обновить</Button>
+          <Button icon={<ReloadOutlined />} onClick={() => qc.invalidateQueries({ queryKey: ['allTasks'] })}>Обновить</Button>
         </Flex>
       </Flex>
 
-      {selectedProjectId ? (
-        <div style={{ display: 'flex', gap: 16, height: '100%', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', gap: 16, height: '100%', overflow: 'hidden' }}>
           {/* Левая панель - список чатов */}
           <Card style={{ width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column' }} styles={{ body: { padding: 0, flex: 1, overflow: 'hidden' } }}>
             <div style={{ overflowY: 'auto', height: '100%' }}>
@@ -193,8 +273,31 @@ export default function ChatsPage() {
                         }
                         title={
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: isActive ? 600 : 400 }}>#{t.id} · {t.name}</span>
-                            {meta?.ts ? <Typography.Text type="secondary" style={{ fontSize: 12 }}>{new Date(meta.ts).toLocaleTimeString()}</Typography.Text> : null}
+                            <div>
+                              <div style={{ fontWeight: isActive ? 600 : 400 }}>#{t.id} · {t.name}</div>
+                              <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                                {projectMap[t.project_id]?.name || `Проект #${t.project_id}`}
+                              </Typography.Text>
+                            </div>
+                            {meta?.ts ? (
+                              <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                                {(() => {
+                                  const msgDate = new Date(meta.ts)
+                                  const now = new Date()
+                                  const diffDays = Math.floor((now.getTime() - msgDate.getTime()) / (1000 * 60 * 60 * 24))
+                                  
+                                  if (diffDays === 0) {
+                                    return msgDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                                  } else if (diffDays === 1) {
+                                    return 'Вчера'
+                                  } else if (diffDays < 7) {
+                                    return msgDate.toLocaleDateString('ru-RU', { weekday: 'short' })
+                                  } else {
+                                    return msgDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+                                  }
+                                })()}
+                              </Typography.Text>
+                            ) : null}
                           </div>
                         }
                         description={<Typography.Text style={{ opacity: 0.9 }} ellipsis>{meta?.preview || ' '}</Typography.Text>}
@@ -255,11 +358,6 @@ export default function ChatsPage() {
             )}
           </Card>
         </div>
-      ) : (
-        <Card>
-          <Empty description="Выберите проект на странице Проекты" />
-        </Card>
-      )}
     </Flex>
   )
 }
