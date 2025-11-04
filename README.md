@@ -18,6 +18,14 @@
    - Backend OpenAPI: `http://localhost:8000/docs`
    - Frontend: `http://localhost:5173`
 
+## Авторизация и пользователи по умолчанию
+- Фронтенд-страница входа: `http://localhost:5173/login`
+- API: `POST /auth/login` с телом `{ "email": string, "password": string }`, далее используйте заголовок `Authorization: Bearer <token>`
+- Пользователи (создаются автоматически при первом старте, если БД пуста):
+  - admin@example.com / admin — Администратор
+  - manager@example.com / manager — Проектный менеджер
+  - executor@example.com / executor — Исполнитель
+
 ## Локальный запуск без Docker (SQLite)
 Backend и frontend можно запустить локально без Docker. База по умолчанию — SQLite (файл `backend/app.db`).
 
@@ -141,6 +149,6 @@ docker-compose.yml
 
 ## Примечания
 - Для простоты миграции Alembic не включены на первом этапе; БД создаётся через `SQLAlchemy.create_all()`.
-- Авторизация планируется позже. Роли присутствуют в модели.
+- Авторизация реализована (JWT), роли: admin / manager / executor. При пустой БД создаются демо-пользователи.
 
 # ais-project

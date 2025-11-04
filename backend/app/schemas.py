@@ -16,6 +16,19 @@ class UserOut(BaseModel):
         from_attributes = True
 
 
+class UserCreate(BaseModel):
+    email: str
+    full_name: str
+    password: str
+    role: UserRole
+
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[UserRole] = None
+
+
 class ProjectCreate(BaseModel):
     name: str
     description: Optional[str] = None

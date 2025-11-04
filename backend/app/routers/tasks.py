@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from .. import models, schemas
+from ..auth import get_current_user, require_roles
 from pydantic import BaseModel
 from typing import List
 
@@ -13,17 +14,23 @@ router = APIRouter()
 
 
 @router.get("/", response_model=List[schemas.TaskOut])
-def list_tasks(project_id: int = Query(...), db: Session = Depends(get_db)):
-    return (
-        db.query(models.Task)
-        .filter(models.Task.project_id == project_id)
-        .order_by(models.Task.id)
-        .all()
-    )
+def list_tasks(
+    project_id: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    q = db.query(models.Task).filter(models.Task.project_id == project_id)
+    if current_user.role == models.UserRole.executor:
+        q = q.filter(models.Task.assignee_id == current_user.id)
+    return q.order_by(models.Task.id).all()
 
 
 @router.post("/", response_model=schemas.TaskOut)
-def create_task(payload: schemas.TaskCreate, db: Session = Depends(get_db)):
+def create_task(
+    payload: schemas.TaskCreate,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_roles(models.UserRole.admin, models.UserRole.manager)),
+):
     # Ensure project exists
     project = db.query(models.Project).get(payload.project_id)
     if not project:
@@ -37,7 +44,11 @@ def create_task(payload: schemas.TaskCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/dependencies", response_model=schemas.DependencyOut)
-def add_dependency(payload: schemas.DependencyCreate, db: Session = Depends(get_db)):
+def add_dependency(
+    payload: schemas.DependencyCreate,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_roles(models.UserRole.admin, models.UserRole.manager)),
+):
     if payload.task_id == payload.depends_on_task_id:
         raise HTTPException(status_code=400, detail="Task cannot depend on itself")
 
@@ -71,11 +82,23 @@ class TaskUpdatePayload(BaseModel):
 
 
 @router.patch("/{task_id}", response_model=schemas.TaskOut)
-def update_task(task_id: int, payload: TaskUpdatePayload, db: Session = Depends(get_db)):
+def update_task(
+    task_id: int,
+    payload: TaskUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     task = db.query(models.Task).get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     data = payload.model_dump(exclude_unset=True)
+
+    # Permissions: executors can update only their tasks and limited fields
+    if current_user.role == models.UserRole.executor:
+        if task.assignee_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Можно изменять только свои задачи")
+        allowed_fields = {"status", "description"}
+        data = {k: v for k, v in data.items() if k in allowed_fields}
 
     # Enforce dependency rule: a task cannot be started or completed
     # unless all its predecessors are done
@@ -111,7 +134,11 @@ def update_task(task_id: int, payload: TaskUpdatePayload, db: Session = Depends(
 
 
 @router.get("/{task_id}/dependencies", response_model=List[schemas.DependencyOut])
-def list_task_dependencies(task_id: int, db: Session = Depends(get_db)):
+def list_task_dependencies(
+    task_id: int,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
     return (
         db.query(models.TaskDependency)
         .filter(models.TaskDependency.task_id == task_id)
@@ -125,7 +152,12 @@ class TaskDependenciesPayload(BaseModel):
 
 
 @router.put("/{task_id}/dependencies", response_model=List[schemas.DependencyOut])
-def replace_task_dependencies(task_id: int, payload: TaskDependenciesPayload, db: Session = Depends(get_db)):
+def replace_task_dependencies(
+    task_id: int,
+    payload: TaskDependenciesPayload,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_roles(models.UserRole.admin, models.UserRole.manager)),
+):
     task = db.query(models.Task).get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")

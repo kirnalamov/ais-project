@@ -6,6 +6,7 @@ import { createDependency, createTask, getTaskDependencies, listTasks, setTaskDe
 import { useState } from 'react'
 import TaskForm from '../components/TaskForm'
 import { useProjectStore } from '../store/useProjectStore'
+import { useAuthStore } from '../store/useAuthStore'
 
 function useTasks(projectId: number | null) {
   return useQuery({
@@ -26,6 +27,7 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
   const [searchId, setSearchId] = useState<string>('')
   const { bumpGraphRefresh } = useProjectStore()
+  const role = useAuthStore(s => s.user?.role)
 
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 80 },
@@ -101,7 +103,9 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
             style={{ width: 150 }}
           />
           <Button icon={<ReloadOutlined />} onClick={() => qc.invalidateQueries({ queryKey: ['tasks', selectedProjectId] })} disabled={!selectedProjectId}>Обновить</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)} disabled={!selectedProjectId}>Новая задача</Button>
+          {(role === 'admin' || role === 'manager') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)} disabled={!selectedProjectId}>Новая задача</Button>
+          )}
         </Flex>
       </Flex>
       <Card>

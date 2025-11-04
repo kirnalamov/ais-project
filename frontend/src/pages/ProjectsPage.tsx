@@ -3,6 +3,7 @@ import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createProject, listProjects, Project } from '../api/client'
 import { useState } from 'react'
+import { useAuthStore } from '../store/useAuthStore'
 import ProjectForm from '../components/ProjectForm'
 import { useProjectStore } from '../store/useProjectStore'
 import { useNavigate } from 'react-router-dom'
@@ -13,6 +14,7 @@ export default function ProjectsPage() {
   const [open, setOpen] = useState(false)
   const { selectedProjectId, setSelectedProjectId } = useProjectStore()
   const navigate = useNavigate()
+  const role = useAuthStore(s => s.user?.role)
 
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 80 },
@@ -38,7 +40,9 @@ export default function ProjectsPage() {
         <Typography.Title level={3} style={{ margin: 0 }}>Проекты</Typography.Title>
         <Flex gap={8}>
           <Button icon={<ReloadOutlined />} onClick={() => qc.invalidateQueries({ queryKey: ['projects'] })}>Обновить</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>Новый проект</Button>
+          {(role === 'admin' || role === 'manager') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>Новый проект</Button>
+          )}
         </Flex>
       </Flex>
       <Card>
