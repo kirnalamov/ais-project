@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
 from .db import init_db, SessionLocal
 from .routers import projects, tasks, analysis, auth as auth_router, users as users_router, events as events_router
 from . import models
 from .auth import get_password_hash
+from .services.demo import ensure_demo_data
 
 
 app = FastAPI(title="Корпоративный планировщик задач")
@@ -21,31 +23,10 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup() -> None:
     init_db()
-    # Seed default users if none exist
     db = SessionLocal()
     try:
-        has_users = db.query(models.User).first() is not None
-        if not has_users:
-            admin = models.User(
-                email="admin@example.com",
-                full_name="Администратор",
-                role=models.UserRole.admin,
-                password_hash=get_password_hash("admin"),
-            )
-            manager = models.User(
-                email="manager@example.com",
-                full_name="Проектный менеджер",
-                role=models.UserRole.manager,
-                password_hash=get_password_hash("manager"),
-            )
-            executor = models.User(
-                email="executor@example.com",
-                full_name="Исполнитель",
-                role=models.UserRole.executor,
-                password_hash=get_password_hash("executor"),
-            )
-            db.add_all([admin, manager, executor])
-            db.commit()
+        _ensure_default_users(db)
+        ensure_demo_data(db)
     finally:
         db.close()
 
@@ -62,5 +43,33 @@ app.include_router(analysis.router, prefix="/analysis", tags=["analysis"])
 def root() -> dict:
     return {"status": "ok"}
 
+
+
+def _ensure_default_users(db: Session) -> None:
+    has_users = db.query(models.User).first() is not None
+    if has_users:
+        return
+
+    admin = models.User(
+        email="admin@example.com",
+        full_name="Администратор",
+        role=models.UserRole.admin,
+        password_hash=get_password_hash("admin"),
+    )
+    manager = models.User(
+        email="manager@example.com",
+        full_name="Проектный менеджер",
+        role=models.UserRole.manager,
+        password_hash=get_password_hash("manager"),
+    )
+    executor = models.User(
+        email="executor@example.com",
+        full_name="Исполнитель",
+        role=models.UserRole.executor,
+        password_hash=get_password_hash("executor"),
+    )
+
+    db.add_all([admin, manager, executor])
+    db.commit()
 
 

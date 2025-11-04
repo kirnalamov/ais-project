@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import require_roles, get_password_hash, get_current_user
 from ..db import get_db
+from ..services.demo import ensure_user_in_demo_project
 
 
 router = APIRouter()
@@ -37,6 +38,7 @@ def create_user(
     db.add(user)
     db.commit()
     db.refresh(user)
+    ensure_user_in_demo_project(db, user)
     return user
 
 

@@ -1,7 +1,8 @@
-import { Button, Card, Flex, Table, Typography, message } from 'antd'
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Button, Card, Flex, Popconfirm, Table, Typography, message } from 'antd'
+import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createProject, listProjects, Project } from '../api/client'
+import type { ColumnsType } from 'antd/es/table'
+import { createProject, deleteProject, listProjects, Project } from '../api/client'
 import { useState } from 'react'
 import { useAuthStore } from '../store/useAuthStore'
 import ProjectForm from '../components/ProjectForm'
@@ -15,12 +16,52 @@ export default function ProjectsPage() {
   const { selectedProjectId, setSelectedProjectId } = useProjectStore()
   const navigate = useNavigate()
   const role = useAuthStore(s => s.user?.role)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
-  const columns = [
+  const handleDelete = async (projectId: number) => {
+    try {
+      setDeletingId(projectId)
+      await deleteProject(projectId)
+      message.success('Проект удалён')
+      if (selectedProjectId === projectId) {
+        setSelectedProjectId(null)
+      }
+      await qc.invalidateQueries({ queryKey: ['projects'] })
+    } catch (e: any) {
+      message.error(e?.message || 'Не удалось удалить проект')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const columns: ColumnsType<Project> = [
     { title: 'ID', dataIndex: 'id', width: 80 },
     { title: 'Название', dataIndex: 'name' },
     { title: 'Описание', dataIndex: 'description' }
   ]
+
+  if (role === 'admin') {
+    columns.push({
+      title: 'Действия',
+      dataIndex: 'actions',
+      width: 140,
+      render: (_, record) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Popconfirm
+            title="Удалить проект?"
+            description="Все задачи и данные проекта будут удалены."
+            okText="Удалить"
+            cancelText="Отмена"
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button danger icon={<DeleteOutlined />} loading={deletingId === record.id} disabled={deletingId !== null && deletingId !== record.id}>
+              Удалить
+            </Button>
+          </Popconfirm>
+        </div>
+      )
+    })
+  }
 
   const onCreate = async (values: any) => {
     try {

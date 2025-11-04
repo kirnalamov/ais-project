@@ -1,4 +1,4 @@
-import { Button, List, Modal, Space, Typography, AutoComplete, message, Tag, Popconfirm } from 'antd'
+import { Button, List, Modal, Space, Typography, AutoComplete, message, Tag, Popconfirm, Input } from 'antd'
 import { useEffect, useState } from 'react'
 import { addProjectMember, deleteProjectMember, listProjectMembers, searchUsers } from '../api/client'
 
@@ -20,8 +20,9 @@ export default function ProjectMembers({ projectId, open, onClose, canManage, in
   }
 
   useEffect(() => {
+    if (!projectId || Number.isNaN(projectId)) return
     if (inline || open) load()
-  }, [inline, open])
+  }, [inline, open, projectId])
 
   const onSearch = async (val: string) => {
     setQuery(val)
@@ -54,10 +55,15 @@ export default function ProjectMembers({ projectId, open, onClose, canManage, in
           options={options}
           onSearch={onSearch}
           onSelect={onSelect}
-          placeholder="Добавить участника по имени или email"
-          style={{ width: '100%' }}
-          disabled={adding}
-        />
+        >
+          <Input
+            placeholder="Добавить участника по имени или email"
+            style={{ width: '100%' }}
+            disabled={adding}
+            name="project-member-search"
+            id={`project-${projectId}-member-search`}
+          />
+        </AutoComplete>
       )}
       <List
         loading={loading}

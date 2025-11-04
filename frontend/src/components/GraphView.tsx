@@ -7,6 +7,7 @@ import { Card, Space, Tag, Button, Tooltip } from 'antd'
 import { CheckCircleTwoTone, SyncOutlined, CloseCircleTwoTone } from '@ant-design/icons'
 import { updateTask, listTasks, listProjectMembers, type Task } from '../api/client'
 import { useProjectStore } from '../store/useProjectStore'
+import { useAuthStore } from '../store/useAuthStore'
 
 type GraphNode = {
   id: number
@@ -198,8 +199,11 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
   const [tasks, setTasks] = useState<Task[]>([])
   const [membersMap, setMembersMap] = useState<Record<number, { id: number; full_name: string }>>({})
   const criticalSet = useMemo(() => new Set<number>(data?.critical_path || []), [data])
+  const auth = useAuthStore()
   const canAct = useMemo(() => {
     if (!data || !clickNode) return { canStart: true, canDone: true }
+    // Admin can perform any action
+    if (auth.user?.role === 'admin') return { canStart: true, canDone: true }
     const preds = data.edges.filter(e => e.target === clickNode.id).map(e => e.source)
     if (preds.length === 0) return { canStart: true, canDone: true }
     const allPredsDone = preds.every(pid => data.nodes.find(n => n.id === pid)?.status === 'done')
@@ -207,7 +211,7 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
     // Done allowed only if predecessors done AND current status is in_progress
     const canDone = allPredsDone && clickNode.status === 'in_progress'
     return { canStart, canDone }
-  }, [data, clickNode])
+  }, [data, clickNode, auth.user])
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     if (!data) return { nodes: [], edges: [] } as { nodes: RFNode[]; edges: RFEdge[] }

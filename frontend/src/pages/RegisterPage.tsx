@@ -29,22 +29,22 @@ export default function RegisterPage() {
         <Typography.Title level={3} style={{ textAlign: 'center' }}>Регистрация</Typography.Title>
         <Form layout="vertical" onFinish={onFinish}>
           <Form.Item label="Email" name="email" rules={[{ required: true, type: 'email' }]}>
-            <Input placeholder="email@example.com" />
+            <Input placeholder="email@example.com" autoComplete="email" />
           </Form.Item>
           <Form.Item label="Пароль" name="password" rules={[{ required: true, min: 6 }]}>
-            <Input.Password placeholder="••••••••" />
+            <Input.Password placeholder="••••••••" autoComplete="new-password" />
           </Form.Item>
           <Form.Item label="ФИО" name="full_name" rules={[{ required: true }]}>
-            <Input placeholder="Иванов Иван Иванович" />
+            <Input placeholder="Иванов Иван Иванович" autoComplete="name" />
           </Form.Item>
           <Form.Item label="Ник" name="nickname">
-            <Input placeholder="@ivan" />
+            <Input placeholder="@ivan" autoComplete="nickname" />
           </Form.Item>
           <Form.Item label="Контактный номер" name="phone">
-            <Input placeholder="+7 999 123-45-67" />
+            <Input placeholder="+7 999 123-45-67" autoComplete="tel" inputMode="tel" />
           </Form.Item>
           <Form.Item label="Telegram" name="telegram">
-            <Input placeholder="@telegram" />
+            <Input placeholder="@telegram" autoComplete="off" />
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={loading}>Зарегистрироваться</Button>
           <div style={{ marginTop: 12, textAlign: 'center' }}>
