@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import init_db, SessionLocal
-from .routers import projects, tasks, analysis, auth as auth_router, users as users_router
+from .routers import projects, tasks, analysis, auth as auth_router, users as users_router, events as events_router
 from . import models
 from .auth import get_password_hash
 
@@ -52,6 +52,7 @@ def on_startup() -> None:
 
 app.include_router(auth_router.router, prefix="/auth", tags=["auth"])
 app.include_router(users_router.router, prefix="/users", tags=["users"])
+app.include_router(events_router.router, prefix="/events", tags=["events"])
 app.include_router(projects.router, prefix="/projects", tags=["projects"])
 app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 app.include_router(analysis.router, prefix="/analysis", tags=["analysis"])

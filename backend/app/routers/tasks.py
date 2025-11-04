@@ -1,11 +1,13 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette.background import BackgroundTasks
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from .. import models, schemas
 from ..auth import get_current_user, require_roles
+from ..events import notify_project
 from pydantic import BaseModel
 from typing import List
 
@@ -48,6 +50,7 @@ def create_task(
     payload: schemas.TaskCreate,
     db: Session = Depends(get_db),
     _: models.User = Depends(require_roles(models.UserRole.admin, models.UserRole.manager)),
+    background_tasks: BackgroundTasks = None,
 ):
     # Ensure project exists
     project = db.query(models.Project).get(payload.project_id)
@@ -70,6 +73,8 @@ def create_task(
     db.add(task)
     db.commit()
     db.refresh(task)
+    if background_tasks is not None:
+        background_tasks.add_task(notify_project, task.project_id, "task_created")
     return task
 
 
@@ -117,6 +122,7 @@ def update_task(
     payload: TaskUpdatePayload,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
+    background_tasks: BackgroundTasks = None,
 ):
     task = db.query(models.Task).get(task_id)
     if not task:
@@ -186,6 +192,8 @@ def update_task(
     db.add(task)
     db.commit()
     db.refresh(task)
+    if background_tasks is not None:
+        background_tasks.add_task(notify_project, task.project_id, "task_updated")
     return task
 
 
@@ -213,6 +221,7 @@ def replace_task_dependencies(
     payload: TaskDependenciesPayload,
     db: Session = Depends(get_db),
     _: models.User = Depends(require_roles(models.UserRole.admin, models.UserRole.manager)),
+    background_tasks: BackgroundTasks = None,
 ):
     task = db.query(models.Task).get(task_id)
     if not task:
@@ -242,6 +251,8 @@ def replace_task_dependencies(
     db.commit()
     for d in new_deps:
         db.refresh(d)
+    if background_tasks is not None:
+        background_tasks.add_task(notify_project, task.project_id, "deps_updated")
     return new_deps
 
 
@@ -278,6 +289,7 @@ def send_task_message(
     payload: schemas.TaskMessageCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
+    background_tasks: BackgroundTasks = None,
 ):
     task = db.query(models.Task).get(task_id)
     if not task:
@@ -295,6 +307,8 @@ def send_task_message(
     db.add(msg)
     db.commit()
     db.refresh(msg)
+    if background_tasks is not None:
+        background_tasks.add_task(notify_project, task.project_id, "message")
     return msg
 
 

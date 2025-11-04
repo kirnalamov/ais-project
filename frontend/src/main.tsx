@@ -8,7 +8,16 @@ import 'antd/dist/reset.css'
 import './global.css'
 
 const root = createRoot(document.getElementById('root')!)
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      retry: 1,
+      staleTime: 0
+    }
+  }
+})
 root.render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

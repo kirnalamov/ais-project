@@ -51,13 +51,16 @@ export default function GanttView({ projectId, apiBase }: { projectId: number; a
 
   useEffect(() => {
     if (!projectId) return
-    fetch(`${apiBase}/analysis/projects/${projectId}/graph`)
-      .then((r) => {
-        if (!r.ok) throw new Error('Failed to load graph')
-        return r.json()
-      })
+    const load = () => fetch(`${apiBase}/analysis/projects/${projectId}/graph`)
+      .then((r) => { if (!r.ok) throw new Error('Failed to load graph'); return r.json() })
       .then((g: GraphAnalysis) => setData(g))
       .catch(() => setData(null))
+    load()
+    // Subscribe to SSE for live updates
+    const sse = new EventSource(`${apiBase}/events/projects/${projectId}/stream`)
+    sse.onmessage = () => load()
+    sse.onerror = () => { /* silently fallback */ }
+    return () => sse.close()
   }, [projectId, apiBase])
 
   const rows = useMemo(() => {

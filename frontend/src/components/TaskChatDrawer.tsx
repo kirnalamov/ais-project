@@ -24,6 +24,8 @@ export default function TaskChatDrawer({ taskId, open, onClose }: { taskId: numb
   useEffect(() => {
     if (open) {
       load()
+      const t = setInterval(() => load(), 3000)
+      return () => clearInterval(t)
     }
   }, [open, taskId])
 

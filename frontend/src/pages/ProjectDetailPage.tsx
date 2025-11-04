@@ -21,7 +21,7 @@ export default function ProjectDetailPage() {
   const navigate = useNavigate()
   const auth = useAuthStore()
   const [membersOpen, setMembersOpen] = useState(false)
-  const { data: project, isError } = useQuery({ queryKey: ['project', projectId], queryFn: () => getProject(projectId), enabled: !isNaN(projectId) })
+  const { data: project, isError } = useQuery({ queryKey: ['project', projectId], queryFn: () => getProject(projectId), enabled: !isNaN(projectId), refetchInterval: 5000 })
   const canManage = useMemo(() => {
     if (!auth.user) return false
     if (auth.user.role === 'admin') return true

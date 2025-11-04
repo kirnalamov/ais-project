@@ -13,7 +13,8 @@ function useTasks(projectId: number | null) {
   return useQuery({
     queryKey: ['tasks', projectId],
     queryFn: () => listTasks(projectId!),
-    enabled: !!projectId
+    enabled: !!projectId,
+    refetchInterval: 4000
   })
 }
 
@@ -40,6 +41,19 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
   }
 
   useEffect(() => { loadMembers() }, [selectedProjectId])
+
+  // SSE: live refresh tasks when project updates
+  useEffect(() => {
+    if (!selectedProjectId) return
+    const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+    const sse = new EventSource(`${API_BASE}/events/projects/${selectedProjectId}/stream`)
+    sse.onmessage = () => {
+      qc.invalidateQueries({ queryKey: ['tasks', selectedProjectId] })
+      loadMembers()
+      bumpGraphRefresh()
+    }
+    return () => sse.close()
+  }, [selectedProjectId, qc, bumpGraphRefresh])
 
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 80 },

@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom'
 
 export default function ProjectsPage() {
   const qc = useQueryClient()
-  const { data, isLoading } = useQuery({ queryKey: ['projects'], queryFn: listProjects })
+  const { data, isLoading } = useQuery({ queryKey: ['projects'], queryFn: listProjects, refetchInterval: 5000 })
   const [open, setOpen] = useState(false)
   const { selectedProjectId, setSelectedProjectId } = useProjectStore()
   const navigate = useNavigate()

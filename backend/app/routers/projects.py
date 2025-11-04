@@ -1,6 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.background import BackgroundTasks
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -41,6 +42,7 @@ def create_project(
     payload: schemas.ProjectCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_roles(models.UserRole.admin, models.UserRole.manager)),
+    background_tasks: BackgroundTasks = None,
 ):
     data = payload.model_dump()
     if current_user.role == models.UserRole.manager and not data.get("manager_id"):
@@ -49,6 +51,9 @@ def create_project(
     db.add(project)
     db.commit()
     db.refresh(project)
+    if background_tasks is not None:
+        from ..events import notify_project
+        background_tasks.add_task(notify_project, project.id, "project_created")
     return project
 
 
@@ -82,6 +87,7 @@ def update_project(
     payload: schemas.ProjectUpdate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
+    background_tasks: BackgroundTasks = None,
 ):
     project = db.query(models.Project).get(project_id)
     if not project:
@@ -98,6 +104,9 @@ def update_project(
     db.add(project)
     db.commit()
     db.refresh(project)
+    if background_tasks is not None:
+        from ..events import notify_project
+        background_tasks.add_task(notify_project, project.id, "project_updated")
     return project
 
 
@@ -135,6 +144,7 @@ def add_member(
     payload: schemas.ProjectMemberCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
+    background_tasks: BackgroundTasks = None,
 ):
     project = db.query(models.Project).get(project_id)
     if not project:
@@ -160,6 +170,9 @@ def add_member(
     db.add(member)
     db.commit()
     db.refresh(member)
+    if background_tasks is not None:
+        from ..events import notify_project
+        background_tasks.add_task(notify_project, project_id, "member_added")
     return member
 
 
@@ -169,6 +182,7 @@ def remove_member(
     user_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
+    background_tasks: BackgroundTasks = None,
 ):
     project = db.query(models.Project).get(project_id)
     if not project:
@@ -185,6 +199,9 @@ def remove_member(
     )
     if deleted:
         db.commit()
+        if background_tasks is not None:
+            from ..events import notify_project
+            background_tasks.add_task(notify_project, project_id, "member_removed")
     return {"status": "ok"}
 
 

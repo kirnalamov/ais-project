@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import ReactFlow, { Background, Controls, MiniMap, MarkerType, Node as RFNode, Edge as RFEdge, useEdgesState, useNodesState, Position, Handle, BaseEdge, getSimpleBezierPath, type EdgeProps } from 'reactflow'
 import 'reactflow/dist/style.css'
 import dagre from 'dagre'
@@ -193,6 +194,7 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
   const [viewport, setViewport] = useState<{ x: number; y: number; zoom: number }>({ x: 0, y: 0, zoom: 1 })
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
   const { graphRefreshTick } = useProjectStore()
+  const qc = useQueryClient()
   const criticalSet = useMemo(() => new Set<number>(data?.critical_path || []), [data])
   const canAct = useMemo(() => {
     if (!data || !clickNode) return { canStart: true, canDone: true }
@@ -220,6 +222,22 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
       return r.json()
     }).then((g: GraphAnalysis) => setData(g)).catch(() => setData(null))
   }, [projectId, apiBase, graphRefreshTick])
+
+  // Poll for updates to keep graph in sync
+  useEffect(() => {
+    if (!projectId) return
+    // Prefer SSE if available
+    const sse = new EventSource(`${apiBase}/events/projects/${projectId}/stream`)
+    sse.onmessage = () => {
+      fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r => r.ok ? r.json() : null).then(g => { if (g) setData(g) })
+      qc.invalidateQueries({ queryKey: ['tasks', projectId] })
+    }
+    sse.onerror = () => {
+      // fallback to polling when SSE not available
+      sse.close()
+    }
+    return () => sse.close()
+  }, [projectId, apiBase])
 
   useEffect(() => {
     setNodes(initialNodes)
@@ -310,12 +328,12 @@ export default function GraphView({ projectId, apiBase, readonly = false, showDu
             {criticalSet.has(clickNode.id) && <Tag color="red">Критический путь</Tag>}
             <Space wrap size={[8, 8]}>
               <Tooltip title={!canAct.canDone ? (clickNode.status !== 'in_progress' ? "Нельзя завершить: задача не 'in_progress'" : 'Сначала завершите все предшественники') : undefined}>
-                <Button size="small" disabled={!canAct.canDone} icon={<CheckCircleTwoTone twoToneColor="#52c41a" />} onClick={async () => { await updateTask(clickNode.id, { status: 'done' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>Done</Button>
+                <Button size="small" disabled={!canAct.canDone} icon={<CheckCircleTwoTone twoToneColor="#52c41a" />} onClick={async () => { await updateTask(clickNode.id, { status: 'done' }); setClickNode(null); setData(null); qc.invalidateQueries({ queryKey: ['tasks', projectId] }); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>Done</Button>
               </Tooltip>
               <Tooltip title={!canAct.canStart ? 'Нельзя начать: есть незавершённые предшественники' : undefined}>
-                <Button size="small" disabled={!canAct.canStart} icon={<SyncOutlined spin={false} />} onClick={async () => { await updateTask(clickNode.id, { status: 'in_progress' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>In Progress</Button>
+                <Button size="small" disabled={!canAct.canStart} icon={<SyncOutlined spin={false} />} onClick={async () => { await updateTask(clickNode.id, { status: 'in_progress' }); setClickNode(null); setData(null); qc.invalidateQueries({ queryKey: ['tasks', projectId] }); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>In Progress</Button>
               </Tooltip>
-              <Button size="small" icon={<CloseCircleTwoTone twoToneColor="#ff4d4f" />} onClick={async () => { await updateTask(clickNode.id, { status: 'backlog' }); setClickNode(null); setData(null); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>Backlog</Button>
+              <Button size="small" icon={<CloseCircleTwoTone twoToneColor="#ff4d4f" />} onClick={async () => { await updateTask(clickNode.id, { status: 'backlog' }); setClickNode(null); setData(null); qc.invalidateQueries({ queryKey: ['tasks', projectId] }); fetch(`${apiBase}/analysis/projects/${projectId}/graph`).then(r=>r.json()).then(setData) }}>Backlog</Button>
             </Space>
           </div>
         )}
