@@ -28,10 +28,10 @@ export default function LoginPage() {
         <Typography.Title level={3} style={{ textAlign: 'center' }}>Вход</Typography.Title>
         <Form layout="vertical" onFinish={onFinish} initialValues={{ email: 'admin@example.com', password: 'admin' }}>
           <Form.Item label="Email" name="email" rules={[{ required: true, type: 'email' }]}>
-            <Input placeholder="email@example.com" />
+            <Input placeholder="email@example.com" autoComplete="username" />
           </Form.Item>
           <Form.Item label="Пароль" name="password" rules={[{ required: true }]}>
-            <Input.Password placeholder="••••••••" />
+            <Input.Password placeholder="••••••••" autoComplete="current-password" />
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={loading}>Войти</Button>
           <div style={{ marginTop: 12, textAlign: 'center' }}>
