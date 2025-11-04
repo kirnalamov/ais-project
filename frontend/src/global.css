@@ -1,0 +1,75 @@
+/* Global dark background and subtle pattern */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(1200px 600px at 20% -10%, rgba(41, 88, 255, 0.12), transparent 60%),
+              radial-gradient(1000px 520px at 110% 10%, rgba(0, 185, 111, 0.10), transparent 60%),
+              linear-gradient(180deg, #0b0f15 0%, #0b0f15 100%);
+  color-scheme: dark;
+}
+
+/* Subtle grid dots */
+.app-grid-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(#1f2633 1px, transparent 1px);
+  background-size: 18px 18px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Layout content spacing fixes */
+.ant-layout {
+  background: transparent;
+}
+
+.ant-card {
+  backdrop-filter: saturate(120%) blur(6px);
+}
+
+/* React Flow dark polish */
+.react-flow__controls {
+  background: #0f131a !important;
+  border: 1px solid #2b2b2b !important;
+  border-radius: 8px !important;
+}
+
+.react-flow__controls button {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid #314055 !important;
+  color: #d4e2f7 !important;
+  width: 30px !important;
+  height: 30px !important;
+  margin: 6px !important;
+  border-radius: 8px !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+.react-flow__controls button:hover {
+  color: #e9fff6 !important;
+  background: rgba(0, 185, 111, 0.18) !important;
+  border-color: rgba(0, 185, 111, 0.45) !important;
+}
+.react-flow__controls button svg {
+  fill: #c7d2e8 !important; /* softer, not bright white */
+}
+.react-flow__controls button:hover svg {
+  fill: #e9fff6 !important;
+}
+.react-flow__controls button:active {
+  background: rgba(0, 185, 111, 0.28) !important;
+}
+.react-flow__controls button:disabled {
+  opacity: 0.55 !important;
+}
+
+.react-flow__minimap {
+  background: #0f131a !important;
+  border: 1px solid #2b2b2b !important;
+  border-radius: 8px !important;
+}
+
+
