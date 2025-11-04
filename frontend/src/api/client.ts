@@ -50,6 +50,11 @@ export async function updateProject(projectId: number, payload: Partial<{ name: 
   return r.json()
 }
 
+export async function deleteProject(projectId: number): Promise<void> {
+  const r = await fetch(`${API_BASE}/projects/${projectId}`, { method: 'DELETE', headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to delete project')
+}
+
 export async function deleteProjectMember(projectId: number, userId: number): Promise<any> {
   const r = await fetch(`${API_BASE}/projects/${projectId}/members/${userId}`, { method: 'DELETE', headers: { ...authHeaders() } })
   if (!r.ok) throw new Error('Failed to remove member')

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import verify_password, create_access_token, get_current_user, get_password_hash
 from ..db import get_db
+from ..services.demo import ensure_user_in_demo_project
 
 
 router = APIRouter()
@@ -52,6 +53,7 @@ def register(payload: schemas.UserRegister, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+    ensure_user_in_demo_project(db, user)
     return user
 
 

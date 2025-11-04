@@ -205,4 +205,25 @@ def remove_member(
     return {"status": "ok"}
 
 
+@router.delete("/{project_id}")
+def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_roles(models.UserRole.admin)),
+    background_tasks: BackgroundTasks = None,
+):
+    project = db.query(models.Project).get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    db.delete(project)
+    db.commit()
+
+    if background_tasks is not None:
+        from ..events import notify_project
+        background_tasks.add_task(notify_project, project_id, "project_deleted")
+
+    return {"status": "deleted"}
+
+
 
