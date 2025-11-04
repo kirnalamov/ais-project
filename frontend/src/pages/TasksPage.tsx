@@ -85,9 +85,7 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
           const deps = await getTaskDependencies(record.id)
           setEditInitial({ ...record, depends_on: deps.map(d => d.depends_on_task_id) })
           setEditOpen(true)
-        }}>
-          Редактировать
-        </Button>
+        }} />
         {canChat && (
           <Button icon={<MessageOutlined />} onClick={() => { setChatTaskId(record.id); setChatOpen(true) }}>Чат</Button>
         )}

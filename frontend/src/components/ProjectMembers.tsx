@@ -2,7 +2,7 @@ import { Button, List, Modal, Space, Typography, AutoComplete, message, Tag, Pop
 import { useEffect, useState } from 'react'
 import { addProjectMember, deleteProjectMember, listProjectMembers, searchUsers } from '../api/client'
 
-export default function ProjectMembers({ projectId, open, onClose, canManage }: { projectId: number; open: boolean; onClose: () => void; canManage: boolean }) {
+export default function ProjectMembers({ projectId, open, onClose, canManage, inline = false }: { projectId: number; open?: boolean; onClose?: () => void; canManage: boolean; inline?: boolean }) {
   const [loading, setLoading] = useState(false)
   const [members, setMembers] = useState<Array<{ id: number; project_id: number; user: any }>>([])
   const [query, setQuery] = useState('')
@@ -20,8 +20,8 @@ export default function ProjectMembers({ projectId, open, onClose, canManage }: 
   }
 
   useEffect(() => {
-    if (open) load()
-  }, [open])
+    if (inline || open) load()
+  }, [inline, open])
 
   const onSearch = async (val: string) => {
     setQuery(val)
@@ -46,44 +46,49 @@ export default function ProjectMembers({ projectId, open, onClose, canManage }: 
     }
   }
 
-  return (
-    <Modal open={open} onCancel={onClose} onOk={onClose} okText="Готово" cancelButtonProps={{ style: { display: 'none' } }} title={`Участники проекта #${projectId}`}>      
-      <Space direction="vertical" style={{ width: '100%' }} size={12}>
-        {canManage && (
-          <AutoComplete
-            value={query}
-            options={options}
-            onSearch={onSearch}
-            onSelect={onSelect}
-            placeholder="Добавить участника по имени или email"
-            style={{ width: '100%' }}
-            disabled={adding}
-          />
-        )}
-        <List
-          loading={loading}
-          dataSource={members}
-          renderItem={(m) => (
-            <List.Item
-              actions={canManage ? [
-                <Popconfirm key="rm" title="Убрать из проекта?" onConfirm={async () => {
-                  await deleteProjectMember(projectId, m.user.id)
-                  await load()
-                }}>
-                  <Button danger size="small">Убрать</Button>
-                </Popconfirm>
-              ] : undefined}
-            >
-              <Space>
-                <Typography.Text>{m.user.full_name}</Typography.Text>
-                <Typography.Text type="secondary">{m.user.email}</Typography.Text>
-                {m.user.nickname && <Tag>@{m.user.nickname}</Tag>}
-                <Tag color="blue">{m.user.role}</Tag>
-              </Space>
-            </List.Item>
-          )}
+  const content = (
+    <Space direction="vertical" style={{ width: '100%' }} size={12}>
+      {canManage && (
+        <AutoComplete
+          value={query}
+          options={options}
+          onSearch={onSearch}
+          onSelect={onSelect}
+          placeholder="Добавить участника по имени или email"
+          style={{ width: '100%' }}
+          disabled={adding}
         />
-      </Space>
+      )}
+      <List
+        loading={loading}
+        dataSource={members}
+        renderItem={(m) => (
+          <List.Item
+            actions={canManage ? [
+              <Popconfirm key="rm" title="Убрать из проекта?" onConfirm={async () => {
+                await deleteProjectMember(projectId, m.user.id)
+                await load()
+              }}>
+                <Button danger size="small">Убрать</Button>
+              </Popconfirm>
+            ] : undefined}
+          >
+            <Space>
+              <Typography.Text>{m.user.full_name}</Typography.Text>
+              <Typography.Text type="secondary">{m.user.email}</Typography.Text>
+              {m.user.nickname && <Tag>@{m.user.nickname}</Tag>}
+              <Tag color="blue">{m.user.role}</Tag>
+            </Space>
+          </List.Item>
+        )}
+      />
+    </Space>
+  )
+
+  if (inline) return content
+  return (
+    <Modal open={!!open} onCancel={onClose} onOk={onClose} okText="Готово" cancelButtonProps={{ style: { display: 'none' } }} title={`Участники проекта #${projectId}`}>
+      {content}
     </Modal>
   )
 }
