@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from ..auth import verify_password, create_access_token, get_current_user
+from ..auth import verify_password, create_access_token, get_current_user, get_password_hash
 from ..db import get_db
 
 
@@ -33,5 +33,25 @@ def login(payload: LoginPayload, db: Session = Depends(get_db)):
 @router.get("/me", response_model=schemas.UserOut)
 def me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/register", response_model=schemas.UserOut)
+def register(payload: schemas.UserRegister, db: Session = Depends(get_db)):
+    exists = db.query(models.User).filter(models.User.email == payload.email).first()
+    if exists:
+        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
+    user = models.User(
+        email=payload.email,
+        full_name=payload.full_name,
+        nickname=payload.nickname,
+        phone=payload.phone,
+        telegram=payload.telegram,
+        role=models.UserRole.executor,
+        password_hash=get_password_hash(payload.password),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 

@@ -1,5 +1,5 @@
 import { Button, Card, Form, Input, Typography, message } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { login } from '../api/client'
 import { useAuthStore } from '../store/useAuthStore'
 import { useState } from 'react'
@@ -34,6 +34,9 @@ export default function LoginPage() {
             <Input.Password placeholder="••••••••" />
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={loading}>Войти</Button>
+          <div style={{ marginTop: 12, textAlign: 'center' }}>
+            Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
+          </div>
           <div style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
             <div>Демо пользователи:</div>
             <div>admin@example.com / admin</div>

@@ -1,9 +1,15 @@
 import { Form, Input, Modal } from 'antd'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
-export default function ProjectForm({ open, onOk, onCancel }: { open: boolean; onOk: (values: any) => void; onCancel: () => void }) {
+export default function ProjectForm({ open, onOk, onCancel, initialValues, title = 'Новый проект', okText = 'Создать' }: { open: boolean; onOk: (values: any) => void; onCancel: () => void; initialValues?: any; title?: string; okText?: string }) {
   const [form] = Form.useForm()
   const [confirmLoading, setConfirmLoading] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      form.setFieldsValue(initialValues || { name: '', description: '' })
+    }
+  }, [open, initialValues])
 
   const handleOk = async () => {
     try {
@@ -17,7 +23,7 @@ export default function ProjectForm({ open, onOk, onCancel }: { open: boolean; o
   }
 
   return (
-    <Modal open={open} title="Новый проект" onOk={handleOk} onCancel={onCancel} confirmLoading={confirmLoading} okText="Создать" cancelText="Отмена">
+    <Modal open={open} title={title} onOk={handleOk} onCancel={onCancel} confirmLoading={confirmLoading} okText={okText} cancelText="Отмена">
       <Form layout="vertical" form={form} initialValues={{ name: '' }}>
         <Form.Item label="Название" name="name" rules={[{ required: true, message: 'Укажите название' }]}>
           <Input placeholder="Например: Внедрение ERP" />

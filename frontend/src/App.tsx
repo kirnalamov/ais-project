@@ -7,6 +7,7 @@ import TasksPage from './pages/TasksPage'
 import GraphPage from './pages/GraphPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 import { useAuthStore } from './store/useAuthStore'
 
 const { Header, Sider, Content } = Layout
@@ -47,6 +48,7 @@ export default function App() {
         <Content style={{ margin: 16 }}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/projects" element={auth.token ? <ProjectsPage /> : <Navigate to="/login" replace />} />
             <Route path="/projects/:id" element={auth.token ? <ProjectDetailPage /> : <Navigate to="/login" replace />} />
             <Route path="/tasks" element={auth.token ? <TasksPage /> : <Navigate to="/login" replace />} />

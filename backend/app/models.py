@@ -48,10 +48,14 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    nickname: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    telegram: Mapped[str | None] = mapped_column(String(100), nullable=True)
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole), nullable=False)
 
     projects_managed = relationship("Project", back_populates="manager")
     tasks_assigned = relationship("Task", back_populates="assignee")
+    memberships = relationship("ProjectMember", back_populates="user", cascade="all, delete-orphan")
 
 
 class Project(Base):
@@ -69,6 +73,7 @@ class Project(Base):
 
     manager = relationship("User", back_populates="projects_managed")
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
 
 
 class Task(Base):
@@ -91,6 +96,7 @@ class Task(Base):
     dependencies = relationship("TaskDependency", back_populates="task", foreign_keys="TaskDependency.task_id", cascade="all, delete-orphan")
     dependents = relationship("TaskDependency", back_populates="depends_on_task", foreign_keys="TaskDependency.depends_on_task_id", cascade="all, delete-orphan")
     activities = relationship("ActivityLog", back_populates="task", cascade="all, delete-orphan")
+    messages = relationship("TaskMessage", back_populates="task", cascade="all, delete-orphan")
 
 
 class TaskDependency(Base):
@@ -122,4 +128,30 @@ class ActivityLog(Base):
     task = relationship("Task", back_populates="activities")
 
 
+
+class ProjectMember(Base):
+    __tablename__ = "project_members"
+    __table_args__ = (
+        UniqueConstraint("project_id", "user_id", name="uq_project_member"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+
+    project = relationship("Project", back_populates="members")
+    user = relationship("User", back_populates="memberships")
+
+
+class TaskMessage(Base):
+    __tablename__ = "task_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"), nullable=False, index=True)
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    task = relationship("Task", back_populates="messages")
+    author = relationship("User")
 

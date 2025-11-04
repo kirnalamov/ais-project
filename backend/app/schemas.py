@@ -10,6 +10,9 @@ class UserOut(BaseModel):
     id: int
     email: str
     full_name: str
+    nickname: Optional[str] = None
+    phone: Optional[str] = None
+    telegram: Optional[str] = None
     role: UserRole
 
     class Config:
@@ -27,6 +30,18 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     password: Optional[str] = None
     role: Optional[UserRole] = None
+    nickname: Optional[str] = None
+    phone: Optional[str] = None
+    telegram: Optional[str] = None
+
+
+class UserRegister(BaseModel):
+    email: str
+    full_name: str
+    password: str
+    nickname: Optional[str] = None
+    phone: Optional[str] = None
+    telegram: Optional[str] = None
 
 
 class ProjectCreate(BaseModel):
@@ -45,6 +60,15 @@ class ProjectOut(ProjectCreate):
 
     class Config:
         from_attributes = True
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    deadline: Optional[date] = None
+    customer: Optional[str] = None
+    manager_id: Optional[int] = None
+    budget_plan: Optional[float] = None
 
 
 class TaskCreate(BaseModel):
@@ -78,6 +102,34 @@ class DependencyOut(DependencyCreate):
 
     class Config:
         from_attributes = True
+
+
+class ProjectMemberOut(BaseModel):
+    id: int
+    project_id: int
+    user: UserOut
+
+    class Config:
+        from_attributes = True
+
+
+class ProjectMemberCreate(BaseModel):
+    user_id: int
+
+
+class TaskMessageOut(BaseModel):
+    id: int
+    task_id: int
+    author: UserOut
+    content: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TaskMessageCreate(BaseModel):
+    content: str
 
 
 class GraphNode(BaseModel):

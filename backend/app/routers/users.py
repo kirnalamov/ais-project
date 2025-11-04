@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
-from ..auth import require_roles, get_password_hash
+from ..auth import require_roles, get_password_hash, get_current_user
 from ..db import get_db
 
 
@@ -73,5 +73,41 @@ def delete_user(
     db.delete(user)
     db.commit()
     return {"status": "ok"}
+
+
+@router.patch("/me", response_model=schemas.UserOut)
+def update_me(
+    payload: schemas.UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    data = payload.model_dump(exclude_unset=True)
+    if "password" in data and data["password"]:
+        current_user.password_hash = get_password_hash(data.pop("password"))
+    # Disallow role change via /me
+    data.pop("role", None)
+    for k, v in data.items():
+        setattr(current_user, k, v)
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.get("/search")
+def search_users(q: str, db: Session = Depends(get_db), _: models.User = Depends(require_roles(models.UserRole.admin, models.UserRole.manager))):
+    ql = f"%{q.lower()}%"
+    users = (
+        db.query(models.User)
+        .filter((models.User.email.ilike(ql)) | (models.User.full_name.ilike(ql)) | (models.User.nickname.ilike(ql)))
+        .order_by(models.User.id)
+        .limit(20)
+        .all()
+    )
+    # return minimal public fields
+    return [
+        {"id": u.id, "email": u.email, "full_name": u.full_name, "nickname": u.nickname, "role": u.role}
+        for u in users
+    ]
 
 

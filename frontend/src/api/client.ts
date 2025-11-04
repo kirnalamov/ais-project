@@ -12,6 +12,15 @@ export type Project = {
   description?: string
 }
 
+export type ProjectDetail = Project & {
+  manager_id?: number
+  deadline?: string
+  customer?: string
+  budget_plan?: number
+  created_at?: string
+  updated_at?: string
+}
+
 export type Task = {
   id: number
   name: string
@@ -26,6 +35,24 @@ export type Task = {
 export async function listProjects(): Promise<Project[]> {
   const r = await fetch(`${API_BASE}/projects/`, { headers: { ...authHeaders() } })
   if (!r.ok) throw new Error('Failed to load projects')
+  return r.json()
+}
+
+export async function getProject(projectId: number): Promise<ProjectDetail> {
+  const r = await fetch(`${API_BASE}/projects/${projectId}`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to load project')
+  return r.json()
+}
+
+export async function updateProject(projectId: number, payload: Partial<{ name: string; description: string; deadline: string; customer: string; manager_id: number; budget_plan: number }>): Promise<ProjectDetail> {
+  const r = await fetch(`${API_BASE}/projects/${projectId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(payload) })
+  if (!r.ok) throw new Error('Failed to update project')
+  return r.json()
+}
+
+export async function deleteProjectMember(projectId: number, userId: number): Promise<any> {
+  const r = await fetch(`${API_BASE}/projects/${projectId}/members/${userId}`, { method: 'DELETE', headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to remove member')
   return r.json()
 }
 
@@ -80,6 +107,42 @@ export async function login(payload: { email: string; password: string }): Promi
 export async function me(): Promise<any> {
   const r = await fetch(`${API_BASE}/auth/me`, { headers: { ...authHeaders() } })
   if (!r.ok) throw new Error('Failed to load profile')
+  return r.json()
+}
+
+export async function register(payload: { email: string; full_name: string; password: string; nickname?: string; phone?: string; telegram?: string }): Promise<any> {
+  const r = await fetch(`${API_BASE}/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+  if (!r.ok) throw new Error('Failed to register')
+  return r.json()
+}
+
+export async function searchUsers(q: string): Promise<Array<{ id: number; email: string; full_name: string; nickname?: string; role: string }>> {
+  const r = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(q)}`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to search users')
+  return r.json()
+}
+
+export async function listProjectMembers(projectId: number): Promise<Array<{ id: number; project_id: number; user: any }>> {
+  const r = await fetch(`${API_BASE}/projects/${projectId}/members`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to load members')
+  return r.json()
+}
+
+export async function addProjectMember(projectId: number, userId: number): Promise<any> {
+  const r = await fetch(`${API_BASE}/projects/${projectId}/members`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ user_id: userId }) })
+  if (!r.ok) throw new Error('Failed to add member')
+  return r.json()
+}
+
+export async function listTaskMessages(taskId: number): Promise<Array<{ id: number; task_id: number; author: any; content: string; created_at: string }>> {
+  const r = await fetch(`${API_BASE}/tasks/${taskId}/messages`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to load messages')
+  return r.json()
+}
+
+export async function sendTaskMessage(taskId: number, content: string): Promise<any> {
+  const r = await fetch(`${API_BASE}/tasks/${taskId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ content }) })
+  if (!r.ok) throw new Error('Failed to send message')
   return r.json()
 }
 

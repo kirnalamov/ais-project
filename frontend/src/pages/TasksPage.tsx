@@ -1,12 +1,13 @@
 import { Button, Card, Empty, Flex, Space, Table, Tag, Typography, message, Input } from 'antd'
-import { PlusOutlined, ReloadOutlined, EditOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, EditOutlined, ArrowLeftOutlined, MessageOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createDependency, createTask, getTaskDependencies, listTasks, setTaskDependencies, Task, updateTask } from '../api/client'
-import { useState } from 'react'
+import { createDependency, createTask, getTaskDependencies, listProjectMembers, listTasks, setTaskDependencies, Task, updateTask } from '../api/client'
+import { useEffect, useState } from 'react'
 import TaskForm from '../components/TaskForm'
 import { useProjectStore } from '../store/useProjectStore'
 import { useAuthStore } from '../store/useAuthStore'
+import TaskChatDrawer from '../components/TaskChatDrawer'
 
 function useTasks(projectId: number | null) {
   return useQuery({
@@ -28,6 +29,17 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
   const [searchId, setSearchId] = useState<string>('')
   const { bumpGraphRefresh } = useProjectStore()
   const role = useAuthStore(s => s.user?.role)
+  const [assignees, setAssignees] = useState<Array<{ id: number; label: string }>>([])
+  const [chatTaskId, setChatTaskId] = useState<number | null>(null)
+  const [chatOpen, setChatOpen] = useState(false)
+
+  async function loadMembers() {
+    if (!selectedProjectId) return
+    const members = await listProjectMembers(selectedProjectId)
+    setAssignees(members.map((m: any) => ({ id: m.user.id, label: m.user.full_name })))
+  }
+
+  useEffect(() => { loadMembers() }, [selectedProjectId])
 
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 80 },
@@ -36,7 +48,7 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
     { title: 'Длительность', dataIndex: 'duration_plan', width: 120 },
     { title: 'Статус', dataIndex: 'status', width: 140, render: (s: string) => <Tag>{s}</Tag> },
     { title: 'Приоритет', dataIndex: 'priority', width: 120, render: (p: string) => <Tag color={p === 'high' ? 'red' : p === 'medium' ? 'gold' : 'blue'}>{p}</Tag> },
-    { title: 'Действия', key: 'actions', width: 120, render: (_: any, record: Task) => (
+    { title: 'Действия', key: 'actions', width: 180, render: (_: any, record: Task) => (
       <Space>
         <Button icon={<EditOutlined />} onClick={async () => {
           setEditingTaskId(record.id)
@@ -46,6 +58,7 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
         }}>
           Редактировать
         </Button>
+        <Button icon={<MessageOutlined />} onClick={() => { setChatTaskId(record.id); setChatOpen(true) }}>Чат</Button>
       </Space>
     ) }
   ]
@@ -125,8 +138,9 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
           <Empty description="Выберите проект на странице Проекты" />
         )}
       </Card>
-      <TaskForm open={open} onOk={onCreate} onCancel={() => setOpen(false)} predecessors={(data || []).map(t => ({ id: t.id, name: t.name }))} />
-      <TaskForm open={editOpen} onOk={onEdit} onCancel={() => setEditOpen(false)} predecessors={(data || []).filter(t => t.id !== editingTaskId).map(t => ({ id: t.id, name: t.name }))} initialValues={editInitial || undefined} title="Редактировать задачу" okText="Сохранить" />
+      <TaskForm open={open} onOk={onCreate} onCancel={() => setOpen(false)} predecessors={(data || []).map(t => ({ id: t.id, name: t.name }))} assignees={assignees} />
+      <TaskForm open={editOpen} onOk={onEdit} onCancel={() => setEditOpen(false)} predecessors={(data || []).filter(t => t.id !== editingTaskId).map(t => ({ id: t.id, name: t.name }))} initialValues={editInitial || undefined} title="Редактировать задачу" okText="Сохранить" assignees={assignees} />
+      <TaskChatDrawer taskId={chatTaskId} open={chatOpen} onClose={() => setChatOpen(false)} />
     </Flex>
   )
 }
