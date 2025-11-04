@@ -270,6 +270,16 @@ def list_task_messages(
         allowed = False
         if project and project.manager_id == current_user.id:
             allowed = True
+        # allow project managers who are members even if not manager_id
+        if current_user.role == models.UserRole.manager and not allowed:
+            is_member = (
+                db.query(models.ProjectMember)
+                .filter(models.ProjectMember.project_id == task.project_id, models.ProjectMember.user_id == current_user.id)
+                .first()
+                is not None
+            )
+            if is_member:
+                allowed = True
         if task.assignee_id == current_user.id:
             allowed = True
         if not allowed:
@@ -299,6 +309,16 @@ def send_task_message(
         allowed = False
         if project and project.manager_id == current_user.id:
             allowed = True
+        # allow project managers who are members even if not manager_id
+        if current_user.role == models.UserRole.manager and not allowed:
+            is_member = (
+                db.query(models.ProjectMember)
+                .filter(models.ProjectMember.project_id == task.project_id, models.ProjectMember.user_id == current_user.id)
+                .first()
+                is not None
+            )
+            if is_member:
+                allowed = True
         if task.assignee_id == current_user.id:
             allowed = True
         if not allowed:

@@ -238,7 +238,7 @@ export default function GanttView({ projectId, apiBase }: { projectId: number; a
               return (
                 <g key={n.id} filter={isCrit ? 'url(#crit-glow)' : 'url(#soft-shadow)'}>
                   <rect x={x} y={y} width={w} height={h} rx={8} ry={8} fill={s.fill} stroke={isCrit ? '#ff4d4f' : s.border} strokeWidth={2} />
-                  <clipPath id={`clip-${n.id}`}><rect x={x + 8} y={y + 4} width={w - 16} height={h - 8} rx={6} ry={6} /></clipPath>
+                  <clipPath id={`clip-${n.id}`}><rect x={x + 8} y={y + 4} width={Math.max(1, w - 16)} height={Math.max(1, h - 8)} rx={6} ry={6} /></clipPath>
                   <text x={x + w / 2} y={y + h / 2 + 4} textAnchor="middle" fill={s.text} fontWeight={700} fontSize={12} fontFamily="Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial" clipPath={`url(#clip-${n.id})`}>
                     {n.duration} ед.
                     <title>{`ID #${n.id} · ${n.name}`}</title>

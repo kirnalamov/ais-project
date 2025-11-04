@@ -2,7 +2,7 @@ import { Button, Card, Empty, Flex, Space, Table, Tag, Typography, message, Inpu
 import { PlusOutlined, ReloadOutlined, EditOutlined, ArrowLeftOutlined, MessageOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createDependency, createTask, getTaskDependencies, listProjectMembers, listTasks, setTaskDependencies, Task, updateTask } from '../api/client'
+import { createDependency, createTask, getProject, getTaskDependencies, listProjectMembers, listTasks, setTaskDependencies, Task, updateTask } from '../api/client'
 import { useEffect, useState } from 'react'
 import TaskForm from '../components/TaskForm'
 import { useProjectStore } from '../store/useProjectStore'
@@ -30,7 +30,10 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
   const [searchId, setSearchId] = useState<string>('')
   const { bumpGraphRefresh } = useProjectStore()
   const role = useAuthStore(s => s.user?.role)
+  const userId = useAuthStore(s => s.user?.id || null)
+  const [managerId, setManagerId] = useState<number | null>(null)
   const [assignees, setAssignees] = useState<Array<{ id: number; label: string }>>([])
+  const [isMember, setIsMember] = useState<boolean>(false)
   const [chatTaskId, setChatTaskId] = useState<number | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
 
@@ -38,9 +41,16 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
     if (!selectedProjectId) return
     const members = await listProjectMembers(selectedProjectId)
     setAssignees(members.map((m: any) => ({ id: m.user.id, label: m.user.full_name })))
+    const uid = userId
+    setIsMember(!!uid && members.some((m: any) => m.user.id === uid))
   }
 
   useEffect(() => { loadMembers() }, [selectedProjectId])
+
+  useEffect(() => {
+    if (!selectedProjectId) { setManagerId(null); return }
+    getProject(selectedProjectId).then(p => setManagerId(p.manager_id ?? null)).catch(() => setManagerId(null))
+  }, [selectedProjectId])
 
   // SSE: live refresh tasks when project updates
   useEffect(() => {
@@ -62,7 +72,13 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
     { title: 'Длительность', dataIndex: 'duration_plan', width: 120 },
     { title: 'Статус', dataIndex: 'status', width: 140, render: (s: string) => <Tag>{s}</Tag> },
     { title: 'Приоритет', dataIndex: 'priority', width: 120, render: (p: string) => <Tag color={p === 'high' ? 'red' : p === 'medium' ? 'gold' : 'blue'}>{p}</Tag> },
-    { title: 'Действия', key: 'actions', width: 180, render: (_: any, record: Task) => (
+    { title: 'Действия', key: 'actions', width: 220, render: (_: any, record: Task) => {
+      const canChat = (
+        role === 'admin' ||
+        (role === 'manager' && ( (managerId && userId === managerId) || isMember)) ||
+        (role === 'executor' && userId && record.assignee_id === userId)
+      )
+      return (
       <Space>
         <Button icon={<EditOutlined />} onClick={async () => {
           setEditingTaskId(record.id)
@@ -72,9 +88,11 @@ export default function TasksPage({ hideTitle = false }: { hideTitle?: boolean }
         }}>
           Редактировать
         </Button>
-        <Button icon={<MessageOutlined />} onClick={() => { setChatTaskId(record.id); setChatOpen(true) }}>Чат</Button>
+        {canChat && (
+          <Button icon={<MessageOutlined />} onClick={() => { setChatTaskId(record.id); setChatOpen(true) }}>Чат</Button>
+        )}
       </Space>
-    ) }
+    ) }},
   ]
 
   const onCreate = async (values: any) => {

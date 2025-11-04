@@ -16,6 +16,8 @@ export default function TaskChatDrawer({ taskId, open, onClose }: { taskId: numb
       setMessages(res)
       // scroll to bottom
       setTimeout(() => listRef.current?.scrollTo(0, 999999), 0)
+    } catch (e) {
+      // do not throw to UI
     } finally {
       setLoading(false)
     }
