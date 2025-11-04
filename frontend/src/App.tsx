@@ -1,6 +1,6 @@
 import React from 'react'
 import { Layout, Menu, theme, Typography, Button, Tag, Space, Badge } from 'antd'
-import { ProjectOutlined, MessageOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
+import { ProjectOutlined, MessageOutlined, MenuFoldOutlined, MenuUnfoldOutlined, UserOutlined } from '@ant-design/icons'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import ProjectsPage from './pages/ProjectsPage'
 import TasksPage from './pages/TasksPage'
@@ -8,6 +8,7 @@ import GraphPage from './pages/GraphPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import UsersPage from './pages/UsersPage'
 import { useAuthStore } from './store/useAuthStore'
 import ChatsPage from './pages/ChatsPage'
 import NotificationsBell from './components/NotificationsBell'
@@ -25,12 +26,23 @@ export default function App() {
     if (p.startsWith('/projects')) return 'projects'
     if (p.startsWith('/tasks')) return 'tasks'
     if (p.startsWith('/graph')) return 'graph'
+    if (p.startsWith('/users')) return 'users'
     return 'projects'
   }, [location.pathname])
-  const menuItems = [
-    { key: 'projects', icon: <ProjectOutlined />, label: <Link to="/projects">Проекты</Link> },
-    { key: 'chats', icon: <MessageOutlined />, label: <Link to="/chats">Чаты</Link> }
-  ]
+  
+  const menuItems = React.useMemo(() => {
+    const items = [
+      { key: 'projects', icon: <ProjectOutlined />, label: <Link to="/projects">Проекты</Link> },
+      { key: 'chats', icon: <MessageOutlined />, label: <Link to="/chats">Чаты</Link> }
+    ]
+    
+    // Add Users menu item for admin only
+    if (auth.user?.role === 'admin') {
+      items.push({ key: 'users', icon: <UserOutlined />, label: <Link to="/users">Пользователи</Link> })
+    }
+    
+    return items
+  }, [auth.user?.role])
 
   return (
     <Layout style={{ minHeight: '100vh', position: 'relative' }} className="app-grid-bg">
@@ -69,6 +81,7 @@ export default function App() {
             <Route path="/tasks" element={auth.token ? <TasksPage /> : <Navigate to="/login" replace />} />
             <Route path="/graph" element={auth.token ? <GraphPage /> : <Navigate to="/login" replace />} />
             <Route path="/chats" element={auth.token ? <ChatsPage /> : <Navigate to="/login" replace />} />
+            <Route path="/users" element={auth.token && auth.user?.role === 'admin' ? <UsersPage /> : <Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to={auth.token ? '/projects' : '/login'} replace />} />
           </Routes>
         </Content>

@@ -157,4 +157,26 @@ export async function sendTaskMessage(taskId: number, content: string): Promise<
   return r.json()
 }
 
+export type User = {
+  id: number
+  email: string
+  full_name: string
+  nickname?: string
+  phone?: string
+  telegram?: string
+  role: 'admin' | 'manager' | 'executor'
+}
+
+export async function listUsers(): Promise<User[]> {
+  const r = await fetch(`${API_BASE}/users/`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to load users')
+  return r.json()
+}
+
+export async function updateUser(userId: number, payload: Partial<{ full_name: string; role: User['role']; nickname?: string; phone?: string; telegram?: string }>): Promise<User> {
+  const r = await fetch(`${API_BASE}/users/${userId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(payload) })
+  if (!r.ok) throw new Error('Failed to update user')
+  return r.json()
+}
+
 
