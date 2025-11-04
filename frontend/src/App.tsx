@@ -1,6 +1,6 @@
 import React from 'react'
-import { Layout, Menu, theme, Typography, Button, Tag, Space } from 'antd'
-import { ProjectOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
+import { Layout, Menu, theme, Typography, Button, Tag, Space, Badge } from 'antd'
+import { ProjectOutlined, MessageOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import ProjectsPage from './pages/ProjectsPage'
 import TasksPage from './pages/TasksPage'
@@ -9,6 +9,8 @@ import ProjectDetailPage from './pages/ProjectDetailPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import { useAuthStore } from './store/useAuthStore'
+import ChatsPage from './pages/ChatsPage'
+import NotificationsBell from './components/NotificationsBell'
 
 const { Header, Sider, Content } = Layout
 
@@ -17,9 +19,17 @@ export default function App() {
   const { token } = theme.useToken()
   const [collapsed, setCollapsed] = React.useState(false)
   const auth = useAuthStore()
-  const selectedKey = 'projects'
+  const selectedKey = React.useMemo(() => {
+    const p = location.pathname
+    if (p.startsWith('/chats')) return 'chats'
+    if (p.startsWith('/projects')) return 'projects'
+    if (p.startsWith('/tasks')) return 'tasks'
+    if (p.startsWith('/graph')) return 'graph'
+    return 'projects'
+  }, [location.pathname])
   const menuItems = [
-    { key: 'projects', icon: <ProjectOutlined />, label: <Link to="/projects">Проекты</Link> }
+    { key: 'projects', icon: <ProjectOutlined />, label: <Link to="/projects">Проекты</Link> },
+    { key: 'chats', icon: <MessageOutlined />, label: <Link to="/chats">Чаты</Link> }
   ]
   return (
     <Layout style={{ minHeight: '100vh', position: 'relative' }} className="app-grid-bg">
@@ -33,7 +43,10 @@ export default function App() {
             <Button type="text" style={{ color: token.colorText }} icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setCollapsed(!collapsed)} />
             <Typography.Title level={4} style={{ margin: 0, color: token.colorText }}>Корпоративный планировщик задач</Typography.Title>
           </div>
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {auth.user && (
+              <NotificationsBell />
+            )}
             {auth.user ? (
               <Space>
                 <Tag color="green">{auth.user.role}</Tag>
@@ -53,6 +66,7 @@ export default function App() {
             <Route path="/projects/:id" element={auth.token ? <ProjectDetailPage /> : <Navigate to="/login" replace />} />
             <Route path="/tasks" element={auth.token ? <TasksPage /> : <Navigate to="/login" replace />} />
             <Route path="/graph" element={auth.token ? <GraphPage /> : <Navigate to="/login" replace />} />
+            <Route path="/chats" element={auth.token ? <ChatsPage /> : <Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to={auth.token ? '/projects' : '/login'} replace />} />
           </Routes>
         </Content>
