@@ -6,6 +6,7 @@ from .. import models, schemas
 from ..auth import verify_password, create_access_token, get_current_user, get_password_hash
 from ..db import get_db
 from ..services.demo import ensure_user_in_demo_project
+from ..metrics import USER_LOGIN_TOTAL
 
 
 router = APIRouter()
@@ -26,7 +27,10 @@ class TokenOut(BaseModel):
 def login(payload: LoginPayload, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
+        USER_LOGIN_TOTAL.labels(result="fail", role=(user.role.value if user else "unknown")).inc()
         raise HTTPException(status_code=400, detail="Неверный email или пароль")
+    # Успешный логин
+    USER_LOGIN_TOTAL.labels(result="success", role=user.role.value).inc()
     token = create_access_token(subject=user.email)
     return TokenOut(access_token=token, user=user)  # type: ignore[arg-type]
 

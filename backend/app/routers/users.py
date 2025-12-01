@@ -7,6 +7,7 @@ from .. import models, schemas
 from ..auth import require_roles, get_password_hash, get_current_user
 from ..db import get_db
 from ..services.demo import ensure_user_in_demo_project
+from ..metrics import update_users_registered_metrics
 
 
 router = APIRouter()
@@ -38,6 +39,7 @@ def create_user(
     db.add(user)
     db.commit()
     db.refresh(user)
+    update_users_registered_metrics(db)
     ensure_user_in_demo_project(db, user)
     return user
 
@@ -60,6 +62,7 @@ def update_user(
     db.add(user)
     db.commit()
     db.refresh(user)
+    update_users_registered_metrics(db)
     return user
 
 
@@ -74,6 +77,7 @@ def delete_user(
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     db.delete(user)
     db.commit()
+    update_users_registered_metrics(db)
     return {"status": "ok"}
 
 

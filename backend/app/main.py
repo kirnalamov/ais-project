@@ -8,6 +8,7 @@ from .routers import projects, tasks, analysis, auth as auth_router, users as us
 from . import models
 from .auth import get_password_hash
 from .services.demo import ensure_demo_data
+from .metrics import update_users_registered_metrics
 
 
 app = FastAPI(title="Корпоративный планировщик задач")
@@ -31,6 +32,8 @@ def on_startup() -> None:
     try:
         _ensure_default_users(db)
         ensure_demo_data(db)
+        # Обновляем метрики по пользователям (по ролям)
+        update_users_registered_metrics(db)
     finally:
         db.close()
 

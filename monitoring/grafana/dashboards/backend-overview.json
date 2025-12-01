@@ -9,7 +9,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": "5s",
   "panels": [
     {
@@ -18,8 +18,9 @@
       "id": 1,
       "datasource": {
         "type": "prometheus",
-        "uid": "Prometheus"
+        "uid": null
       },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "targets": [
         {
           "expr": "sum(rate(http_requests_total[1m]))",
@@ -36,20 +37,52 @@
       }
     },
     {
-      "type": "graph",
-      "title": "Requests by status code",
-      "id": 2,
+      "type": "stat",
+      "title": "Total users",
+      "id": 6,
       "datasource": {
         "type": "prometheus",
-        "uid": "Prometheus"
+        "uid": null
       },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(http_requests_total[5m])) by (status)",
-          "legendFormat": "{{status}}",
+          "expr": "sum(users_registered_total)",
+          "legendFormat": "users",
           "refId": "A"
         }
-      ]
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Login success rate (last 5m)",
+      "id": 7,
+      "datasource": {
+        "type": "prometheus",
+        "uid": null
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(user_login_total{result=\"success\"}[5m])) / ignoring(result) sum(rate(user_login_total[5m]))",
+          "legendFormat": "success rate",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
     },
     {
       "type": "graph",
@@ -57,8 +90,9 @@
       "id": 3,
       "datasource": {
         "type": "prometheus",
-        "uid": "Prometheus"
+        "uid": null
       },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
@@ -69,12 +103,30 @@
     },
     {
       "type": "graph",
+      "title": "Requests by status code",
+      "id": 2,
+      "datasource": {
+        "type": "prometheus",
+        "uid": null
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[5m])) by (status)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
       "title": "In-flight requests",
       "id": 4,
       "datasource": {
         "type": "prometheus",
-        "uid": "Prometheus"
+        "uid": null
       },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "targets": [
         {
           "expr": "sum(http_requests_in_progress)",
@@ -89,12 +141,47 @@
       "id": 5,
       "datasource": {
         "type": "prometheus",
-        "uid": "Prometheus"
+        "uid": null
       },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
       "targets": [
         {
           "expr": "sum(rate(http_requests_total[5m])) by (handler)",
           "legendFormat": "{{handler}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Users by role",
+      "id": 8,
+      "datasource": {
+        "type": "prometheus",
+        "uid": null
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "expr": "users_registered_total",
+          "legendFormat": "{{role}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Login attempts by result and role",
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": null
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum(rate(user_login_total[5m])) by (result, role)",
+          "legendFormat": "{{result}} / {{role}}",
           "refId": "A"
         }
       ]
