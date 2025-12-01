@@ -5,7 +5,7 @@
 ## Технологический стек
 - Backend: FastAPI (Python 3.11), SQLAlchemy, PostgreSQL
 - Frontend: React + TypeScript, Vite, Cytoscape.js
-- Infra: Docker, docker-compose
+- Infra: Docker, docker-compose, Prometheus, Grafana
 
 ## Быстрый старт (Docker)
 1. Создайте файл окружения:
@@ -86,6 +86,8 @@ npm run dev -- --host
 3. Доступ:
    - Backend OpenAPI: `http://localhost:8000/docs`
    - Frontend: `http://localhost:5173`
+   - Prometheus: `http://localhost:9090`
+   - Grafana: `http://localhost:3000` (логин/пароль: `admin` / `admin`)
    
 Примечание: предупреждение Docker о ключе `version` в `docker-compose.yml` можно игнорировать или удалить поле `version` из файла.
 
@@ -150,5 +152,6 @@ docker-compose.yml
 ## Примечания
 - Для простоты миграции Alembic не включены на первом этапе; БД создаётся через `SQLAlchemy.create_all()`.
 - Авторизация реализована (JWT), роли: admin / manager / executor. При пустой БД создаются демо-пользователи.
+- Метрики backend доступны по `http://localhost:8000/metrics` (Prometheus‑формат). По умолчанию Prometheus собирает метрики с сервиса `backend`, а Grafana может использовать Prometheus как источник данных для дашбордов по нагрузке (RPS, latency, коды ответов и т.п.).
 
 # ais-project

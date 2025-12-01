@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from .db import init_db, SessionLocal
 from .routers import projects, tasks, analysis, auth as auth_router, users as users_router, events as events_router
@@ -10,6 +11,9 @@ from .services.demo import ensure_demo_data
 
 
 app = FastAPI(title="Корпоративный планировщик задач")
+
+# Метрики Prometheus /metrics для Grafana
+Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
     CORSMiddleware,
